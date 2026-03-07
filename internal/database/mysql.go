@@ -16,27 +16,33 @@ func (d *MySQLDriver) Name() string {
 }
 
 // Open opens a MySQL connection
-func (d *MySQLDriver) Open(dsn string) (*sql.DB, error) {
+func (d *MySQLDriver) Open(dsn string) (Handle, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open MySQL connection: %w", err)
 	}
-
-	// Set connection pool settings
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
-
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to ping MySQL: %w", err)
 	}
-
 	return db, nil
 }
 
+// Query executes a query and returns columns and rows
+func (d *MySQLDriver) Query(h Handle, query string) ([]string, [][]interface{}, error) {
+	return sqlQuery(h.(*sql.DB), query)
+}
+
+// Execute runs a statement and returns rows affected
+func (d *MySQLDriver) Execute(h Handle, query string) (int64, error) {
+	return sqlExecute(h.(*sql.DB), query)
+}
+
 // GetTableNames retrieves all table names
-func (d *MySQLDriver) GetTableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SHOW TABLES")
+func (d *MySQLDriver) GetTableNames(h Handle) ([]string, error) {
+	rows, err := h.(*sql.DB).Query("SHOW TABLES")
 	if err != nil {
 		return nil, err
 	}
@@ -50,17 +56,15 @@ func (d *MySQLDriver) GetTableNames(db *sql.DB) ([]string, error) {
 		}
 		tables = append(tables, name)
 	}
-
 	return tables, rows.Err()
 }
 
 // GetTableSchema retrieves schema information for a table
-func (d *MySQLDriver) GetTableSchema(db *sql.DB, table string) ([]map[string]interface{}, error) {
-	query := fmt.Sprintf("DESCRIBE %s", d.QuoteIdentifier(table))
-	return scanSchemaRows(db, query)
+func (d *MySQLDriver) GetTableSchema(h Handle, table string) ([]map[string]interface{}, error) {
+	return scanSchemaRows(h.(*sql.DB), fmt.Sprintf("DESCRIBE `%s`", table))
 }
 
-// QuoteIdentifier quotes a MySQL identifier
-func (d *MySQLDriver) QuoteIdentifier(name string) string {
-	return "`" + name + "`"
+// Close closes the connection
+func (d *MySQLDriver) Close(h Handle) error {
+	return h.(*sql.DB).Close()
 }

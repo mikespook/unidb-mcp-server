@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"errors"
 	"sync"
 	"time"
@@ -15,13 +14,14 @@ var (
 
 // driverRegistry holds all registered drivers
 var driverRegistry = map[string]Driver{
-	"mysql":        &MySQLDriver{},
-	"postgres":     &PostgresDriver{},
-	"postgresql":   &PostgresDriver{},
-	"sqlite":       &SQLiteDriver{},
-	"sqlite3":      &SQLiteDriver{},
-	"mssql":        &MSSQLDriver{},
-	"sqlserver":    &MSSQLDriver{},
+	"mysql":      &MySQLDriver{},
+	"postgres":   &PostgresDriver{},
+	"postgresql": &PostgresDriver{},
+	"sqlite":     &SQLiteDriver{},
+	"sqlite3":    &SQLiteDriver{},
+	"mssql":      &MSSQLDriver{},
+	"sqlserver":  &MSSQLDriver{},
+	"mongodb":    &MongoDriver{},
 }
 
 // RegisterDriver registers a new database driver
@@ -52,7 +52,7 @@ type Connection struct {
 	ID          string    `json:"connection_id"`
 	DSNName     string    `json:"dsn_name"`
 	Driver      string    `json:"driver"`
-	DB          *sql.DB   `json:"-"`
+	Handle      Handle    `json:"-"`
 	driver      Driver    `json:"-"`
 	ConnectedAt time.Time `json:"connected_at"`
 }
@@ -84,7 +84,12 @@ func (m *DriverManager) Connect(id, name, driver, dsn string) (*Connection, erro
 		return nil, ErrConnectionExists
 	}
 
-	db, drv, err := openConnection(driver, dsn)
+	drv, err := GetDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := drv.Open(dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +98,7 @@ func (m *DriverManager) Connect(id, name, driver, dsn string) (*Connection, erro
 		ID:          id,
 		DSNName:     name,
 		Driver:      driver,
-		DB:          db,
+		Handle:      h,
 		driver:      drv,
 		ConnectedAt: time.Now(),
 	}
@@ -112,7 +117,7 @@ func (m *DriverManager) Disconnect(id string) error {
 		return ErrConnectionNotFound
 	}
 
-	if err := conn.DB.Close(); err != nil {
+	if err := conn.driver.Close(conn.Handle); err != nil {
 		return err
 	}
 
@@ -129,7 +134,6 @@ func (m *DriverManager) Get(id string) (*Connection, error) {
 	if !exists {
 		return nil, ErrConnectionNotFound
 	}
-
 	return conn, nil
 }
 
@@ -142,23 +146,7 @@ func (m *DriverManager) List() []*Connection {
 	for _, conn := range m.connections {
 		conns = append(conns, conn)
 	}
-
 	return conns
-}
-
-// openConnection opens a database connection based on the driver
-func openConnection(driver, dsn string) (*sql.DB, Driver, error) {
-	drv, err := GetDriver(driver)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	db, err := drv.Open(dsn)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return db, drv, nil
 }
 
 // TestConnection tests if a DSN is valid without storing the connection
@@ -168,11 +156,9 @@ func TestConnection(driver, dsn string) error {
 		return err
 	}
 
-	db, err := drv.Open(dsn)
+	h, err := drv.Open(dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
-
-	return nil
+	return drv.Close(h)
 }

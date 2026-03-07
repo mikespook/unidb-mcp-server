@@ -24,6 +24,7 @@ HTTP Layer (cmd/mcp-server/main.go)
         │     ├── mysql.go    — MySQL
         │     ├── postgres.go — PostgreSQL
         │     ├── mssql.go    — SQL Server
+        │     ├── mongodb.go  — MongoDB
         │     └── sqlite.go   — SQLite
         └── Store Layer (internal/store/sqlite.go)
               — Persistent config: DSNs, bridges, settings
@@ -54,6 +55,7 @@ unidb/
 │   │   ├── mysql.go
 │   │   ├── postgres.go
 │   │   ├── mssql.go
+│   │   ├── mongodb.go
 │   │   └── sqlite.go
 │   ├── handlers/
 │   │   ├── bridge.go               # BridgeManager + BridgeHandler
@@ -197,6 +199,12 @@ host=localhost port=5432 user=postgres dbname=mydb sslmode=disable
 ```
 sqlserver://user:password@host:1433?database=mydb
 server=host;user id=user;password=password;port=1433;database=mydb
+```
+
+**MongoDB**
+```
+mongodb://host:27017/database
+mongodb://user:password@host:27017/database?authSource=admin
 ```
 
 **SQLite**

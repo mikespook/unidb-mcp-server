@@ -313,7 +313,8 @@ func (h *Handler) handleQuery(id interface{}, args map[string]interface{}) Respo
 		return h.internalError(id, err)
 	}
 
-	rows, err := conn.DB.Query(sqlQuery)
+	driver := conn.GetDriver()
+	columns, result, err := driver.Query(conn.Handle, sqlQuery)
 	if err != nil {
 		return Response{
 			JSONRPC: "2.0",
@@ -324,39 +325,6 @@ func (h *Handler) handleQuery(id interface{}, args map[string]interface{}) Respo
 				Data:    err.Error(),
 			},
 		}
-	}
-	defer rows.Close()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return h.internalError(id, err)
-	}
-
-	result := make([][]interface{}, 0)
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return h.internalError(id, err)
-		}
-
-		row := make([]interface{}, len(columns))
-		for i, v := range values {
-			if b, ok := v.([]byte); ok {
-				row[i] = string(b)
-			} else {
-				row[i] = v
-			}
-		}
-		result = append(result, row)
-	}
-
-	if err := rows.Err(); err != nil {
-		return h.internalError(id, err)
 	}
 
 	return toolResult(id, map[string]interface{}{
@@ -408,7 +376,8 @@ func (h *Handler) handleExecute(id interface{}, args map[string]interface{}) Res
 		return h.internalError(id, err)
 	}
 
-	result, err := conn.DB.Exec(sqlQuery)
+	driver := conn.GetDriver()
+	rowsAffected, err := driver.Execute(conn.Handle, sqlQuery)
 	if err != nil {
 		return Response{
 			JSONRPC: "2.0",
@@ -421,13 +390,9 @@ func (h *Handler) handleExecute(id interface{}, args map[string]interface{}) Res
 		}
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	lastInsertID, _ := result.LastInsertId()
-
 	return toolResult(id, map[string]interface{}{
-		"success":        true,
-		"rows_affected":  rowsAffected,
-		"last_insert_id": lastInsertID,
+		"success":       true,
+		"rows_affected": rowsAffected,
 	})
 }
 
@@ -466,19 +431,19 @@ func (h *Handler) handleSchema(id interface{}, args map[string]interface{}) Resp
 	driver := conn.GetDriver()
 
 	if table != "" {
-		schema, err := driver.GetTableSchema(conn.DB, table)
+		schema, err := driver.GetTableSchema(conn.Handle, table)
 		if err != nil {
 			return h.internalError(id, err)
 		}
 		tables[table] = schema
 	} else {
-		tableNames, err := driver.GetTableNames(conn.DB)
+		tableNames, err := driver.GetTableNames(conn.Handle)
 		if err != nil {
 			return h.internalError(id, err)
 		}
 
 		for _, tableName := range tableNames {
-			schema, err := driver.GetTableSchema(conn.DB, tableName)
+			schema, err := driver.GetTableSchema(conn.Handle, tableName)
 			if err != nil {
 				continue
 			}
