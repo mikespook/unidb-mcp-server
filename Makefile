@@ -1,4 +1,4 @@
-.PHONY: dev build build-image clean
+.PHONY: dev build build-image-server build-image-sqlite-bridge clean
 
 # Binary name
 BINARY := unidb-mcp-server
@@ -28,16 +28,29 @@ build: clean
 	mkdir -p $(BUILD_DIR)/data
 	@echo "Build complete. Output in $(BUILD_DIR)/"
 
-# build-image: build Docker image with latest tag
-# Usage: make build-image
-#        make build-image EXTRA_TAGS="v1.0.0 v1.0"
-build-image:
-	@echo "Building Docker image with latest tag..."
-	docker build -t $(BINARY):latest .
+# build-image-server: build Docker image for the MCP server with latest tag
+# Usage: make build-image-server
+#        make build-image-server EXTRA_TAGS="v1.0.0 v1.0"
+build-image-server:
+	@echo "Building MCP server Docker image with latest tag..."
+	docker build -t mikespook/$(BINARY):latest .
 	@if [ -n "$(EXTRA_TAGS)" ]; then \
 		for tag in $(EXTRA_TAGS); do \
 			echo "Adding tag: $$tag"; \
-			docker tag $(BINARY):latest $(BINARY):$$tag; \
+			docker tag mikespook/$(BINARY):latest mikespook/$(BINARY):$$tag; \
+		done; \
+	fi
+
+# build-image-sqlite-bridge: build Docker image for the SQLite bridge with latest tag
+# Usage: make build-image-sqlite-bridge
+#        make build-image-sqlite-bridge EXTRA_TAGS="v1.0.0 v1.0"
+build-image-sqlite-bridge:
+	@echo "Building SQLite bridge Docker image with latest tag..."
+	docker build -f Dockerfile.bridge -t mikespook/unidb-sqlite-bridge:latest .
+	@if [ -n "$(EXTRA_TAGS)" ]; then \
+		for tag in $(EXTRA_TAGS); do \
+			echo "Adding tag: $$tag"; \
+			docker tag mikespook/unidb-sqlite-bridge:latest mikespook/unidb-sqlite-bridge:$$tag; \
 		done; \
 	fi
 
@@ -73,7 +86,8 @@ help:
 	@echo "Available targets:"
 	@echo "  dev            - Run server in development mode"
 	@echo "  build          - Build binary and copy files to $(BUILD_DIR)/"
-	@echo "  build-image    - Build Docker image with latest tag"
+	@echo "  build-image-server        - Build MCP server Docker image with latest tag"
+	@echo "  build-image-sqlite-bridge - Build SQLite bridge Docker image with latest tag"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  test           - Run tests"
 	@echo "  test-coverage  - Run tests with coverage report"
