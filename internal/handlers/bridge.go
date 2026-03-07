@@ -16,12 +16,16 @@ type BridgeManager struct {
 	bridges map[string]*store.Bridge // keyed by bridge name (in-memory cache)
 }
 
-// NewBridgeManager creates a new bridge manager
+// NewBridgeManager creates a new bridge manager.
+// All bridges are marked disconnected on startup since any previous SSE
+// connections were lost when the server stopped.
 func NewBridgeManager(s *store.Store) *BridgeManager {
-	return &BridgeManager{
+	m := &BridgeManager{
 		store:   s,
 		bridges: make(map[string]*store.Bridge),
 	}
+	s.ResetBridgeConnections()
+	return m
 }
 
 // Register adds a new bridge, or reconnects if name+secret already match

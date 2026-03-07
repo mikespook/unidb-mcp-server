@@ -325,6 +325,12 @@ func (s *Store) CreateBridge(name, secret, bridgeType string) (*Bridge, error) {
 	}, nil
 }
 
+// ResetBridgeConnections marks all bridges as disconnected.
+// Called on server startup to clear stale connected state from the previous run.
+func (s *Store) ResetBridgeConnections() {
+	s.db.Exec(`UPDATE bridges SET connected = 0, updated_at = ? WHERE connected = 1`, time.Now())
+}
+
 // UpdateBridgeConnection updates the connection status of a bridge
 func (s *Store) UpdateBridgeConnection(name string, connected bool) error {
 	now := time.Now()
