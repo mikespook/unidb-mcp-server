@@ -25,6 +25,7 @@ HTTP Layer (cmd/mcp-server/main.go)
         │     ├── postgres.go — PostgreSQL
         │     ├── mssql.go    — SQL Server
         │     ├── mongodb.go  — MongoDB
+        │     ├── redis.go    — Redis
         │     └── sqlite.go   — SQLite
         └── Store Layer (internal/store/sqlite.go)
               — Persistent config: DSNs, bridges, settings
@@ -56,6 +57,7 @@ unidb/
 │   │   ├── postgres.go
 │   │   ├── mssql.go
 │   │   ├── mongodb.go
+│   │   ├── redis.go
 │   │   └── sqlite.go
 │   ├── handlers/
 │   │   ├── bridge.go               # BridgeManager + BridgeHandler
@@ -205,6 +207,12 @@ server=host;user id=user;password=password;port=1433;database=mydb
 ```
 mongodb://host:27017/database
 mongodb://user:password@host:27017/database?authSource=admin
+```
+
+**Redis**
+```
+redis://host:6379/0
+redis://:password@host:6379/0
 ```
 
 **SQLite**

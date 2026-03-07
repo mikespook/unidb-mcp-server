@@ -22,6 +22,7 @@ var driverRegistry = map[string]Driver{
 	"mssql":      &MSSQLDriver{},
 	"sqlserver":  &MSSQLDriver{},
 	"mongodb":    &MongoDriver{},
+	"redis":      &RedisDriver{},
 }
 
 // RegisterDriver registers a new database driver

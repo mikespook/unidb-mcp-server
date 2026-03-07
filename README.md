@@ -4,7 +4,7 @@ A shared MCP server that gives AI agents access to your databases. Run one insta
 
 ## Features
 
-- **Multi-database**: MySQL, PostgreSQL, SQL Server, MongoDB, SQLite
+- **Multi-database**: MySQL, PostgreSQL, SQL Server, MongoDB, Redis, SQLite
 - **Web UI**: Add and manage database connections in your browser
 - **MCP tools**: `connect`, `query`, `execute`, `schema` for AI agent use
 - **SQLite Bridge**: Connect local SQLite files from Docker or remote machines via SSE
