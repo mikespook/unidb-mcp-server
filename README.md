@@ -11,6 +11,19 @@ A shared MCP server that gives AI agents access to your databases. Run one insta
 - **JWT authentication**: Secure API access with bearer tokens
 - **Persistent config**: DSNs and bridge registrations stored in SQLite
 
+## Supported Drivers
+
+| Driver | DSN format |
+|--------|-----------|
+| `mysql` | `user:password@tcp(host:3306)/database` |
+| `postgres` | `postgres://user:password@host:5432/database?sslmode=disable` |
+| `mssql` | `sqlserver://user:password@host:1433?database=mydb` |
+| `mongodb` | `mongodb://user:password@host:27017/database` |
+| `redis` | `redis://:password@host:6379/0` |
+| `etcd` | `http://host:2379` or `etcd://user:password@host:2379` |
+| `sqlite` | `/path/to/database.db` |
+| `sqlite-bridge` | registered bridge name (via Web UI) |
+
 ## Quick Start
 
 ### 1. Configure environment
