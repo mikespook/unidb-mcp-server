@@ -7,7 +7,7 @@ Reference for developers implementing or extending UniDB.
 ## Architecture
 
 ```
-HTTP Layer (cmd/server/main.go)
+HTTP Layer (cmd/mcp-server/main.go)
   ├── Public routes: /, /health, /app.js, /login, /logout, /api/ui/me, /sse
   └── Protected routes: /api/* (JWT middleware via possum.Chain)
         ├── Handlers (internal/handlers/)

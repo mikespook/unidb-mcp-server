@@ -15,12 +15,12 @@ dev:
 	@echo "Starting in development mode..."
 	@mkdir -p data
 	@echo "Data directory created."
-	@DEV_MODE=true DATA_PATH=data/config.db go run ./cmd/server
+	@DEV_MODE=true DATA_PATH=data/config.db go run ./cmd/mcp-server
 
 # build: compile binary and copy required files to build folder
 build: clean
 	@echo "Building $(BINARY)..."
-	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/server
+	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/mcp-server
 	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/unidb-sqlite-bridge ./cmd/sqlite-bridge
 	@echo "Copying web assets..."
 	cp -r web $(BUILD_DIR)/
