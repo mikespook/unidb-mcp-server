@@ -23,6 +23,7 @@ HTTP Layer (cmd/mcp-server/main.go)
         │     ├── drivers.go  — Driver interface & registry
         │     ├── mysql.go    — MySQL
         │     ├── postgres.go — PostgreSQL
+        │     ├── mssql.go    — SQL Server
         │     └── sqlite.go   — SQLite
         └── Store Layer (internal/store/sqlite.go)
               — Persistent config: DSNs, bridges, settings
@@ -37,7 +38,7 @@ The bridge layer (`internal/bridge/`) is the **client** — it runs as a separat
 ```
 unidb/
 ├── cmd/
-│   ├── server/
+│   ├── mcp-server/
 │   │   └── main.go                 # Entry point, routing, JWT middleware
 │   └── sqlite-bridge/
 │       ├── main.go                 # SQLite bridge client binary
@@ -52,6 +53,7 @@ unidb/
 │   │   ├── manager.go              # Connection pool manager
 │   │   ├── mysql.go
 │   │   ├── postgres.go
+│   │   ├── mssql.go
 │   │   └── sqlite.go
 │   ├── handlers/
 │   │   ├── bridge.go               # BridgeManager + BridgeHandler
@@ -189,6 +191,12 @@ user:password@tcp(host:3306)/database?parseTime=true&charset=utf8mb4
 ```
 postgres://user:password@host:5432/database?sslmode=disable
 host=localhost port=5432 user=postgres dbname=mydb sslmode=disable
+```
+
+**SQL Server**
+```
+sqlserver://user:password@host:1433?database=mydb
+server=host;user id=user;password=password;port=1433;database=mydb
 ```
 
 **SQLite**

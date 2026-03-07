@@ -20,6 +20,8 @@ var driverRegistry = map[string]Driver{
 	"postgresql":   &PostgresDriver{},
 	"sqlite":       &SQLiteDriver{},
 	"sqlite3":      &SQLiteDriver{},
+	"mssql":        &MSSQLDriver{},
+	"sqlserver":    &MSSQLDriver{},
 }
 
 // RegisterDriver registers a new database driver
