@@ -19,7 +19,8 @@ function showLoginScreen() {
 
 function showMainContent() {
 	document.getElementById('login-screen').classList.remove('active');
-	document.getElementById('header-actions').style.display = 'flex';
+	document.getElementById('btn-change-password').classList.remove('hidden');
+	document.getElementById('btn-logout').classList.remove('hidden');
 	loadDSNs();
 }
 
@@ -45,7 +46,8 @@ async function login() {
 
 async function logout() {
 	await fetch('/logout', { method: 'POST' });
-	document.getElementById('header-actions').style.display = 'none';
+	document.getElementById('btn-change-password').classList.add('hidden');
+	document.getElementById('btn-logout').classList.add('hidden');
 	showLoginScreen();
 }
 
