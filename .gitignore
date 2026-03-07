@@ -1,0 +1,52 @@
+# Binaries
+unidb-mcp
+unidb-sqlite-bridge
+server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+
+# SQLite database
+data/*.db
+data/*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Build directory
+build/
+
+# SQLite config database
+data/config.db
+
+# MCP configuration
+.mcp.json
+
+# Playwright MCP artifacts
+.playwright-mcp/

@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Qwen
+.qwen
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+unidb-mcp
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+coverage.out
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (should not be in image)
+data/
+
+# Logs
+*.log

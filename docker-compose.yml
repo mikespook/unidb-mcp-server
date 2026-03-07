@@ -1,0 +1,26 @@
+services:
+  unidb-mcp:
+    build: .
+    ports:
+      - "9093:9093"
+    env_file:
+      - .env
+    environment:
+      - ADDR=0.0.0.0:9093
+      - DATA_PATH=/app/data/config.db
+    volumes:
+      # Persist UniDB configuration
+      - unidb-data:/app/data
+      # Mount host SQLite files (optional - for connecting to external SQLite DBs)
+      # Example: - /path/on/host:/host-sqlite:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  unidb-data:
+    driver: local

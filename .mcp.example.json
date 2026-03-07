@@ -1,0 +1,11 @@
+{
+	"mcpServers": {
+		"unidb": {
+			"type": "http",
+			"url": "http://localhost:9093/api/mcp",
+			"headers": {
+				"Authorization": "Bearer <your-secure-secret-key-here>"
+			}
+		}
+	}
+}

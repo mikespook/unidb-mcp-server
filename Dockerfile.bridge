@@ -1,0 +1,45 @@
+# Build stage
+FROM golang:1.26-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the bridge binary
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o unidb-sqlite-bridge ./cmd/sqlite-bridge
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -D appuser
+
+# Copy binary
+COPY --from=builder /app/unidb-sqlite-bridge .
+
+# Create /data mount point
+RUN mkdir -p /data && chown appuser:appgroup /data
+
+# Copy entrypoint script
+COPY --from=builder /app/cmd/sqlite-bridge/docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+USER appuser
+
+# /data/sqlite.db must be mounted by the user
+VOLUME ["/data"]
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
