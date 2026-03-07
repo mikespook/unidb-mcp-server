@@ -122,4 +122,4 @@ Register the bridge in the Web UI under **Bridges**, then use it like any other 
 
 ## License
 
-MIT
+GPL-3.0
