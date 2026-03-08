@@ -1,13 +1,10 @@
 services:
   unidb-mcp:
-    build: .
+    image: mikespook/unidb-mcp-server:latest
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     env_file:
       - .env
-    environment:
-      - ADDR=0.0.0.0:9093
-      - DATA_PATH=/app/data/config.db
     volumes:
       # Persist UniDB configuration
       - unidb-data:/app/data
@@ -15,7 +12,7 @@ services:
       # Example: - /path/on/host:/host-sqlite:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:9093/health" ]
       interval: 30s
       timeout: 10s
       retries: 3

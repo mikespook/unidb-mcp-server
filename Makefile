@@ -15,15 +15,15 @@ dev:
 	@echo "Starting in development mode..."
 	@mkdir -p data
 	@echo "Data directory created."
-	@DEV_MODE=true DATA_PATH=data/config.db go run ./cmd/mcp-server
+	@DEV_MODE=true DATA_PATH=data/config.db go run -C backend ./cmd/mcp-server
 
 # build: compile binary and copy required files to build folder
 build: clean
 	@echo "Building $(BINARY)..."
-	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/mcp-server
-	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/unidb-sqlite-bridge ./cmd/sqlite-bridge
+	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/$(BINARY) ./cmd/mcp-server
+	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/unidb-sqlite-bridge ./cmd/sqlite-bridge
 	@echo "Copying web assets..."
-	cp -r web $(BUILD_DIR)/
+	cp -r frontend $(BUILD_DIR)/
 	@echo "Creating data directory..."
 	mkdir -p $(BUILD_DIR)/data
 	@echo "Build complete. Output in $(BUILD_DIR)/"
@@ -33,7 +33,7 @@ build: clean
 #        make build-image-server EXTRA_TAGS="v1.0.0 v1.0"
 build-image-server:
 	@echo "Building MCP server Docker image with latest tag..."
-	docker build -t mikespook/$(BINARY):latest .
+	docker build -f docker/Dockerfile -t mikespook/$(BINARY):latest .
 	@if [ -n "$(EXTRA_TAGS)" ]; then \
 		for tag in $(EXTRA_TAGS); do \
 			echo "Adding tag: $$tag"; \
@@ -46,7 +46,7 @@ build-image-server:
 #        make build-image-sqlite-bridge EXTRA_TAGS="v1.0.0 v1.0"
 build-image-sqlite-bridge:
 	@echo "Building SQLite bridge Docker image with latest tag..."
-	docker build -f Dockerfile.bridge -t mikespook/unidb-sqlite-bridge:latest .
+	docker build -f docker/Dockerfile.bridge -t mikespook/unidb-sqlite-bridge:latest .
 	@if [ -n "$(EXTRA_TAGS)" ]; then \
 		for tag in $(EXTRA_TAGS); do \
 			echo "Adding tag: $$tag"; \
@@ -62,24 +62,24 @@ clean:
 
 # Run tests
 test:
-	go test -v ./...
+	go test -C backend -v ./...
 
 # Run tests with coverage
 test-coverage:
-	go test -v -coverprofile=coverage.out ./...
+	go test -C backend -v -coverprofile=../coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
 # Lint the code
 lint:
-	golangci-lint run ./...
+	golangci-lint run ./backend/...
 
 # Format the code
 fmt:
-	go fmt ./...
+	go fmt -C backend ./...
 
 # Tidy dependencies
 tidy:
-	go mod tidy
+	go mod -C backend tidy
 
 # Help target
 help:

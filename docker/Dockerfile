@@ -7,14 +7,14 @@ WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o unidb-mcp-server ./cmd/mcp-server
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o unidb-mcp-server ./backend/cmd/mcp-server
 
 # Runtime stage
 FROM alpine:latest
@@ -32,7 +32,7 @@ RUN addgroup -g 1000 appgroup && \
 COPY --from=builder /app/unidb-mcp-server .
 
 # Copy web assets
-COPY --from=builder /app/web ./web
+COPY --from=builder /app/frontend ./frontend
 
 # Create data directory with proper ownership
 RUN mkdir -p /app/data && \

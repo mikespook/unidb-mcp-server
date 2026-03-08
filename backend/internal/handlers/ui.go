@@ -178,12 +178,12 @@ func (h *UIHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // Index serves the main UI page
 func (h *UIHandler) Index(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "web/index.html")
+	http.ServeFile(w, r, "frontend/index.html")
 }
 
 // AppJS serves the app.js file
 func (h *UIHandler) AppJS(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "web/app.js")
+	http.ServeFile(w, r, "frontend/app.js")
 }
 
 // ListDSNs returns all DSN configurations
