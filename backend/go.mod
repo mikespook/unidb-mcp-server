@@ -27,6 +27,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/microsoft/go-mssqldb v1.9.8 // indirect
+	github.com/mikespook/gorbac/v3 v3.0.0-20250828105311-80b2c9ae5182 // indirect
 	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

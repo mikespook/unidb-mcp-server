@@ -4,13 +4,15 @@ import { useAuth } from '../composables/useAuth'
 
 const { login } = useAuth()
 
+const username = ref('')
 const password = ref('')
 const error = ref('')
 
 async function handleLogin() {
   error.value = ''
   try {
-    await login(password.value)
+    await login(username.value, password.value)
+    username.value = ''
     password.value = ''
   } catch (e: unknown) {
     const err = e as { error?: string }
@@ -25,14 +27,26 @@ async function handleLogin() {
       <h2>🗄️ UniDB MCP</h2>
       <div class="login-error">{{ error }}</div>
       <div class="form-group">
+        <label for="login-username">Username</label>
+        <input
+          id="login-username"
+          v-model="username"
+          type="text"
+          placeholder="Enter username"
+          autocomplete="username"
+          @keydown.enter="handleLogin"
+          autofocus
+        />
+      </div>
+      <div class="form-group">
         <label for="login-password">Password</label>
         <input
           id="login-password"
           v-model="password"
           type="password"
           placeholder="Enter password"
+          autocomplete="current-password"
           @keydown.enter="handleLogin"
-          autofocus
         />
       </div>
       <button class="btn btn-primary" style="width: 100%" @click="handleLogin">Login</button>

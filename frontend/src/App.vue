@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useConnections } from './composables/useConnections'
 import { useAlerts } from './composables/useAlerts'
 import type { DSN, Bridge } from './types'
 
+import InitWizard from './components/InitWizard.vue'
 import LoginScreen from './components/LoginScreen.vue'
 import AppHeader from './components/AppHeader.vue'
 import ConnectionsTable from './components/ConnectionsTable.vue'
@@ -14,7 +15,11 @@ import BridgeEditModal from './components/BridgeEditModal.vue'
 import BridgeTipsModal from './components/BridgeTipsModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 
-const { isAuthenticated, checkAuth, logout } = useAuth()
+const { isAuthenticated, needsInit, checkAuth, logout } = useAuth()
+
+async function onInitComplete() {
+  await checkAuth()
+}
 const { dsns, bridges, isLoading, loadAll, createDSN, updateDSN, deleteDSN, testDSN, registerBridge, updateBridge, deleteBridge } = useConnections()
 const { alerts, showAlert } = useAlerts()
 
@@ -38,6 +43,10 @@ const showChangePasswordModal = ref(false)
 onMounted(async () => {
   await checkAuth()
   if (isAuthenticated.value) loadAll()
+})
+
+watch(isAuthenticated, (val) => {
+  if (val) loadAll()
 })
 
 // Auth
@@ -160,10 +169,13 @@ async function handleDeleteBridge(name: string) {
 </script>
 
 <template>
-  <!-- Login screen overlays everything when not authenticated -->
-  <LoginScreen v-if="!isAuthenticated" />
+  <!-- Init wizard: shown on first run before any login -->
+  <InitWizard v-if="needsInit" @complete="onInitComplete" />
 
-  <template v-else>
+  <!-- Login screen overlays everything when not authenticated -->
+  <LoginScreen v-else-if="!isAuthenticated" />
+
+  <template v-else-if="isAuthenticated">
     <AppHeader
       @change-password="showChangePasswordModal = true"
       @logout="handleLogout"

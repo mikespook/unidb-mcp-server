@@ -11,10 +11,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mikespook/possum"
-	"github.com/mikespook/unidb-mcp/internal/config"
 	"github.com/mikespook/unidb-mcp/internal/database"
 	"github.com/mikespook/unidb-mcp/internal/handlers"
 	"github.com/mikespook/unidb-mcp/internal/mcp"
+	apprbac "github.com/mikespook/unidb-mcp/internal/rbac"
 	"github.com/mikespook/unidb-mcp/internal/store"
 )
 
@@ -31,7 +31,6 @@ func main() {
 	}
 	dataPath := flag.String("data", getEnv("DATA_PATH", defaultDataPath), "SQLite database path")
 	frontendPath := flag.String("frontend", getEnv("FRONTEND_PATH", defaultFrontendPath), "Frontend dist directory")
-	resetUIPassword := flag.Bool("reset-ui-password", false, "Reset the UI password and exit")
 	flag.Parse()
 
 	// Initialize SQLite store
@@ -41,27 +40,8 @@ func main() {
 	}
 	defer s.Close()
 
-	// Handle -reset-ui-password flag
-	if *resetUIPassword {
-		newPass, err := config.ResetUIPassword(s)
-		if err != nil {
-			log.Fatalf("Failed to reset UI password: %v", err)
-		}
-		fmt.Printf("UI password reset. New password: %s\n", newPass)
-		return
-	}
-
-	// Load JWT configuration (auto-generates and persists secret if not set)
-	jwtCfg, err := config.LoadJWTConfig(s)
-	if err != nil {
-		log.Fatalf("Failed to load JWT config: %v", err)
-	}
-
-	// Load UI password configuration
-	uiPassCfg, err := config.LoadUIPassword(s)
-	if err != nil {
-		log.Fatalf("Failed to load UI password config: %v", err)
-	}
+	// Initialize RBAC
+	rbac := apprbac.New()
 
 	// Initialize database connection manager
 	manager := database.NewDriverManager()
@@ -70,7 +50,10 @@ func main() {
 	bridgeManager := handlers.NewBridgeManager(s)
 
 	// Initialize handlers
-	uiHandler := handlers.NewUIHandler(s, manager, uiPassCfg, *frontendPath)
+	uiHandler := handlers.NewUIHandler(s, manager, *frontendPath)
+	initHandler := handlers.NewInitHandler(s)
+	userHandler := handlers.NewUserHandler(s, rbac)
+	teamHandler := handlers.NewTeamHandler(s, rbac)
 	mcpHandler := mcp.NewHandler(s, manager)
 	bridgeHandler := handlers.NewBridgeHandler(bridgeManager)
 	sseHandler := handlers.NewSSEHandler(bridgeManager)
@@ -84,7 +67,9 @@ func main() {
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*frontendPath+"/assets"))))
 	mux.HandleFunc("POST /login", uiHandler.Login)
 	mux.HandleFunc("POST /logout", uiHandler.Logout)
+	mux.HandleFunc("POST /init", initHandler.Setup)
 	mux.HandleFunc("GET /api/ui/me", uiHandler.Me)
+	mux.HandleFunc("GET /api/ui/init-status", initHandler.Status)
 
 	// Bridge SSE endpoint (public, authenticated via query params)
 	mux.HandleFunc("/sse", sseHandler.ServeHTTP)
@@ -109,12 +94,10 @@ func main() {
 	apiMux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("MCP %s from %s | Accept: %s", r.Method, r.RemoteAddr, r.Header.Get("Accept"))
 
-		// Handle GET for SSE stream (Streamable HTTP transport)
 		if r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.Header().Set("Cache-Control", "no-cache")
 			w.Header().Set("Connection", "keep-alive")
-			// Keep connection open until client disconnects
 			<-r.Context().Done()
 			return
 		}
@@ -153,6 +136,41 @@ func main() {
 	// UI auth routes (session-protected)
 	apiMux.HandleFunc("POST /ui/password", uiHandler.SessionMiddleware(uiHandler.ChangePassword))
 
+	// User management routes (session + RBAC protected inside handler)
+	apiMux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			userHandler.List(w, r)
+		case http.MethodPost:
+			userHandler.Create(w, r)
+		case http.MethodPut:
+			userHandler.Update(w, r)
+		case http.MethodDelete:
+			userHandler.Delete(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	apiMux.HandleFunc("GET /users/{id}/jwt-secret", userHandler.GetJWTSecret)
+
+	// Team management routes (session + RBAC protected inside handler)
+	apiMux.HandleFunc("/teams", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			teamHandler.List(w, r)
+		case http.MethodPost:
+			teamHandler.Create(w, r)
+		case http.MethodDelete:
+			teamHandler.Delete(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	apiMux.HandleFunc("POST /teams/{id}/users", teamHandler.AddUser)
+	apiMux.HandleFunc("DELETE /teams/{id}/users", teamHandler.RemoveUser)
+	apiMux.HandleFunc("POST /teams/{id}/dsns", teamHandler.AddDSN)
+	apiMux.HandleFunc("DELETE /teams/{id}/dsns", teamHandler.RemoveDSN)
+
 	// Bridge API routes
 	apiMux.HandleFunc("/bridges/register", bridgeHandler.Register)
 	apiMux.HandleFunc("/bridges", func(w http.ResponseWriter, r *http.Request) {
@@ -173,7 +191,7 @@ func main() {
 		apiMux.ServeHTTP,
 		possum.Log,
 		possum.Cors(nil),
-		jwtMiddleware(jwtCfg),
+		jwtMiddleware(s),
 	)
 
 	// Mount API routes
@@ -189,11 +207,10 @@ func main() {
 	}
 }
 
-// jwtMiddleware creates JWT authentication middleware
-func jwtMiddleware(cfg *config.JWTConfig) possum.HandlerFunc {
+// jwtMiddleware validates Bearer tokens against all per-user JWT secrets.
+func jwtMiddleware(s *store.Store) possum.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for certain paths
 			if isPublicPath(r.URL.Path) {
 				next(w, r)
 				return
@@ -210,28 +227,35 @@ func jwtMiddleware(cfg *config.JWTConfig) possum.HandlerFunc {
 				http.Error(w, `{"error": "Invalid authorization header format"}`, http.StatusUnauthorized)
 				return
 			}
-
 			tokenString := parts[1]
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, jwt.ErrSignatureInvalid
-				}
-				return []byte(cfg.Secret), nil
-			})
 
-			if err != nil || !token.Valid {
+			secrets, err := s.ListAllJWTSecrets()
+			if err != nil || len(secrets) == 0 {
 				http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
 				return
 			}
 
-			next(w, r)
+			for _, secret := range secrets {
+				token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, jwt.ErrSignatureInvalid
+					}
+					return []byte(secret), nil
+				})
+				if err == nil && token.Valid {
+					next(w, r)
+					return
+				}
+			}
+
+			http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
 		}
 	}
 }
 
-// isPublicPath checks if the path should be accessible without authentication
+// isPublicPath checks if the path should be accessible without JWT authentication
 func isPublicPath(path string) bool {
-	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/bridges/register"}
+	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/ui/init-status", "/bridges/register"}
 	for _, p := range publicPaths {
 		if path == p || strings.HasPrefix(path, p) {
 			return true

@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/mikespook/unidb-mcp/internal/config"
 	"github.com/mikespook/unidb-mcp/internal/database"
 	"github.com/mikespook/unidb-mcp/internal/store"
 )
@@ -22,29 +21,38 @@ const sessionDuration = 24 * time.Hour
 type UIHandler struct {
 	store        *store.Store
 	manager      *database.DriverManager
-	uiPassCfg    *config.UIPasswordConfig
 	frontendPath string
 }
 
 // NewUIHandler creates a new UI handler
-func NewUIHandler(s *store.Store, m *database.DriverManager, p *config.UIPasswordConfig, frontendPath string) *UIHandler {
+func NewUIHandler(s *store.Store, m *database.DriverManager, frontendPath string) *UIHandler {
 	return &UIHandler{
 		store:        s,
 		manager:      m,
-		uiPassCfg:    p,
 		frontendPath: frontendPath,
 	}
 }
 
-// SessionMiddleware checks the session cookie for UI routes. Passes through if auth is disabled.
+// sessionUser retrieves the User associated with the current session cookie.
+func (h *UIHandler) sessionUser(r *http.Request) (*store.User, error) {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return nil, err
+	}
+	if !h.store.ValidateSession(cookie.Value) {
+		return nil, sql.ErrNoRows
+	}
+	userID, err := h.store.GetSessionUser(cookie.Value)
+	if err != nil {
+		return nil, err
+	}
+	return h.store.GetUser(userID)
+}
+
+// SessionMiddleware checks the session cookie for UI routes.
 func (h *UIHandler) SessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.uiPassCfg.Disabled {
-			next(w, r)
-			return
-		}
-		cookie, err := r.Cookie(sessionCookieName)
-		if err != nil || !h.store.ValidateSession(cookie.Value) {
+		if _, err := h.sessionUser(r); err != nil {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
@@ -52,46 +60,41 @@ func (h *UIHandler) SessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// Me returns 200 if the session is valid, 401 otherwise.
+// Me returns session info if the session is valid.
 func (h *UIHandler) Me(w http.ResponseWriter, r *http.Request) {
-	if h.uiPassCfg.Disabled {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"authenticated": true, "disabled": true})
-		return
-	}
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil || !h.store.ValidateSession(cookie.Value) {
+	u, err := h.sessionUser(r)
+	if err != nil {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"authenticated": true})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"authenticated": true,
+		"username":      u.Username,
+		"role":          u.Role,
+	})
 }
 
-// Login verifies the password and sets a session cookie.
+// Login verifies username+password and sets a session cookie.
 func (h *UIHandler) Login(w http.ResponseWriter, r *http.Request) {
-	if h.uiPassCfg.Disabled {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"success": true})
-		return
-	}
-
 	var req struct {
+		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Password == "" {
-		http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
+		http.Error(w, `{"error":"username and password required"}`, http.StatusBadRequest)
 		return
 	}
 
-	hash, err := h.store.GetSetting("ui_password_hash")
+	u, err := h.store.GetUserByUsername(req.Username)
 	if err != nil {
-		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
+		// Don't distinguish "not found" from "wrong password"
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		http.Error(w, `{"error":"invalid password"}`, http.StatusUnauthorized)
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
 
@@ -103,7 +106,7 @@ func (h *UIHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(buf)
 
-	if err := h.store.CreateSession(token, time.Now().Add(sessionDuration)); err != nil {
+	if err := h.store.CreateSessionWithUser(token, time.Now().Add(sessionDuration), u.ID); err != nil {
 		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -125,7 +128,7 @@ func (h *UIHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *UIHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
-		_ = h.store.DeleteSession(cookie.Value)
+		_ = h.store.DeleteSessionWithUser(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:   sessionCookieName,
@@ -137,8 +140,14 @@ func (h *UIHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// ChangePassword updates the UI password (requires valid session).
+// ChangePassword updates the current user's password (requires valid session).
 func (h *UIHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	u, err := h.sessionUser(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
 	var req struct {
 		Current string `json:"current"`
 		New     string `json:"new"`
@@ -148,17 +157,7 @@ func (h *UIHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := h.store.GetSetting("ui_password_hash")
-	if err == sql.ErrNoRows {
-		http.Error(w, `{"error":"password not set"}`, http.StatusBadRequest)
-		return
-	}
-	if err != nil {
-		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Current)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Current)); err != nil {
 		http.Error(w, `{"error":"current password is incorrect"}`, http.StatusUnauthorized)
 		return
 	}
@@ -169,7 +168,7 @@ func (h *UIHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SetSetting("ui_password_hash", string(newHash)); err != nil {
+	if err := h.store.UpdateUserPassword(u.ID, string(newHash)); err != nil {
 		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -235,7 +234,6 @@ func (h *UIHandler) CreateDSN(w http.ResponseWriter, r *http.Request) {
 
 // UpdateDSN modifies an existing DSN configuration
 func (h *UIHandler) UpdateDSN(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from URL path
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, `{"error": "id is required"}`, http.StatusBadRequest)
@@ -281,7 +279,6 @@ func (h *UIHandler) UpdateDSN(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDSN removes a DSN configuration
 func (h *UIHandler) DeleteDSN(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from URL path
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, `{"error": "id is required"}`, http.StatusBadRequest)
