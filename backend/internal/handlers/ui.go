@@ -20,17 +20,19 @@ const sessionDuration = 24 * time.Hour
 
 // UIHandler handles web UI requests
 type UIHandler struct {
-	store     *store.Store
-	manager   *database.DriverManager
-	uiPassCfg *config.UIPasswordConfig
+	store        *store.Store
+	manager      *database.DriverManager
+	uiPassCfg    *config.UIPasswordConfig
+	frontendPath string
 }
 
 // NewUIHandler creates a new UI handler
-func NewUIHandler(s *store.Store, m *database.DriverManager, p *config.UIPasswordConfig) *UIHandler {
+func NewUIHandler(s *store.Store, m *database.DriverManager, p *config.UIPasswordConfig, frontendPath string) *UIHandler {
 	return &UIHandler{
-		store:     s,
-		manager:   m,
-		uiPassCfg: p,
+		store:        s,
+		manager:      m,
+		uiPassCfg:    p,
+		frontendPath: frontendPath,
 	}
 }
 
@@ -176,14 +178,9 @@ func (h *UIHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// Index serves the main UI page
+// Index serves the Vite-built SPA entry point
 func (h *UIHandler) Index(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "frontend/index.html")
-}
-
-// AppJS serves the app.js file
-func (h *UIHandler) AppJS(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "frontend/app.js")
+	http.ServeFile(w, r, h.frontendPath+"/index.html")
 }
 
 // ListDSNs returns all DSN configurations

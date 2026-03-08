@@ -22,12 +22,15 @@ func main() {
 	// Command line flags
 	addr := flag.String("addr", getEnv("ADDR", "localhost:9093"), "Server listen address")
 
-	// Set default data path based on development mode
+	// Set default paths based on development mode
 	defaultDataPath := "/app/data/config.db"
+	defaultFrontendPath := "frontend/dist"
 	if os.Getenv("DEV_MODE") == "true" {
 		defaultDataPath = "data/config.db"
+		defaultFrontendPath = "../frontend/dist"
 	}
 	dataPath := flag.String("data", getEnv("DATA_PATH", defaultDataPath), "SQLite database path")
+	frontendPath := flag.String("frontend", getEnv("FRONTEND_PATH", defaultFrontendPath), "Frontend dist directory")
 	resetUIPassword := flag.Bool("reset-ui-password", false, "Reset the UI password and exit")
 	flag.Parse()
 
@@ -67,7 +70,7 @@ func main() {
 	bridgeManager := handlers.NewBridgeManager(s)
 
 	// Initialize handlers
-	uiHandler := handlers.NewUIHandler(s, manager, uiPassCfg)
+	uiHandler := handlers.NewUIHandler(s, manager, uiPassCfg, *frontendPath)
 	mcpHandler := mcp.NewHandler(s, manager)
 	bridgeHandler := handlers.NewBridgeHandler(bridgeManager)
 	sseHandler := handlers.NewSSEHandler(bridgeManager)
@@ -78,7 +81,7 @@ func main() {
 	// Public routes
 	mux.HandleFunc("/", uiHandler.Index)
 	mux.HandleFunc("/health", handlers.HealthHandler)
-	mux.HandleFunc("/app.js", uiHandler.AppJS)
+	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*frontendPath+"/assets"))))
 	mux.HandleFunc("POST /login", uiHandler.Login)
 	mux.HandleFunc("POST /logout", uiHandler.Logout)
 	mux.HandleFunc("GET /api/ui/me", uiHandler.Me)
@@ -228,7 +231,7 @@ func jwtMiddleware(cfg *config.JWTConfig) possum.HandlerFunc {
 
 // isPublicPath checks if the path should be accessible without authentication
 func isPublicPath(path string) bool {
-	publicPaths := []string{"/", "/health", "/app.js", "/sse", "/mcp", "/ui/", "/bridges/register"}
+	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/bridges/register"}
 	for _, p := range publicPaths {
 		if path == p || strings.HasPrefix(path, p) {
 			return true

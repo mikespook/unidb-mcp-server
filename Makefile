@@ -1,4 +1,4 @@
-.PHONY: dev build build-image-server build-image-sqlite-bridge clean
+.PHONY: dev dev-frontend build build-frontend build-image-server build-image-sqlite-bridge clean
 
 # Binary name
 BINARY := unidb-mcp-server
@@ -10,20 +10,32 @@ LDFLAGS := -ldflags "-s -w"
 # Default target
 all: build
 
-# dev: run the server in development mode
+# dev: run the backend server in development mode
 dev:
 	@echo "Starting in development mode..."
-	@mkdir -p data
+	@mkdir -p backend/data
 	@echo "Data directory created."
 	@DEV_MODE=true DATA_PATH=data/config.db go run -C backend ./cmd/mcp-server
 
-# build: compile binary and copy required files to build folder
-build: clean
+# dev-frontend: run the Vite dev server (proxy to backend at :9093)
+dev-frontend:
+	@echo "Starting Vite dev server..."
+	npm --prefix frontend run dev
+
+# build-frontend: install deps and build Vue/Vite frontend
+build-frontend:
+	@echo "Building frontend..."
+	npm --prefix frontend install
+	npm --prefix frontend run build
+
+# build: compile binaries and assemble output in build folder
+build: clean build-frontend
 	@echo "Building $(BINARY)..."
 	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/$(BINARY) ./cmd/mcp-server
 	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/unidb-sqlite-bridge ./cmd/sqlite-bridge
-	@echo "Copying web assets..."
-	cp -r frontend $(BUILD_DIR)/
+	@echo "Copying frontend dist..."
+	mkdir -p $(BUILD_DIR)/frontend
+	cp -r frontend/dist $(BUILD_DIR)/frontend/dist
 	@echo "Creating data directory..."
 	mkdir -p $(BUILD_DIR)/data
 	@echo "Build complete. Output in $(BUILD_DIR)/"
@@ -84,7 +96,9 @@ tidy:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  dev            - Run server in development mode"
+	@echo "  dev            - Run backend server in development mode"
+	@echo "  dev-frontend   - Run Vite dev server (proxy to :9093)"
+	@echo "  build-frontend - Build Vue/Vite frontend"
 	@echo "  build          - Build binary and copy files to $(BUILD_DIR)/"
 	@echo "  build-image-server        - Build MCP server Docker image with latest tag"
 	@echo "  build-image-sqlite-bridge - Build SQLite bridge Docker image with latest tag"

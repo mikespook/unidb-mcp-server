@@ -1,4 +1,13 @@
-# Build stage
+# Frontend build stage
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+# Backend build stage
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
@@ -12,6 +21,9 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Copy frontend dist from frontend-builder
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Build the application
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o unidb-mcp-server ./backend/cmd/mcp-server
@@ -31,8 +43,8 @@ RUN addgroup -g 1000 appgroup && \
 # Copy binary from builder
 COPY --from=builder /app/unidb-mcp-server .
 
-# Copy web assets
-COPY --from=builder /app/frontend ./frontend
+# Copy frontend dist
+COPY --from=builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with proper ownership
 RUN mkdir -p /app/data && \
