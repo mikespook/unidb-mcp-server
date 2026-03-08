@@ -84,13 +84,13 @@ func (h *InitHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create default team and add admin to it
-	team, err := h.store.EnsureDefaultTeam()
-	if err != nil {
-		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
-		return
+	// Seed default teams; add admin user to the admin team
+	for _, name := range []string{"admin", "team1", "team2"} {
+		t, err := h.store.CreateTeam(name)
+		if err == nil && name == "admin" {
+			_ = h.store.AddUserToTeam(user.ID, t.ID)
+		}
 	}
-	_ = h.store.AddUserToTeam(user.ID, team.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

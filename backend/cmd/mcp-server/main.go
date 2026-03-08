@@ -166,8 +166,10 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	apiMux.HandleFunc("GET /teams/{id}/users", teamHandler.GetUsers)
 	apiMux.HandleFunc("POST /teams/{id}/users", teamHandler.AddUser)
 	apiMux.HandleFunc("DELETE /teams/{id}/users", teamHandler.RemoveUser)
+	apiMux.HandleFunc("GET /teams/{id}/dsns", teamHandler.GetDSNs)
 	apiMux.HandleFunc("POST /teams/{id}/dsns", teamHandler.AddDSN)
 	apiMux.HandleFunc("DELETE /teams/{id}/dsns", teamHandler.RemoveDSN)
 

@@ -133,6 +133,12 @@ export const createTeam = (name: string) =>
 export const deleteTeam = (id: string) =>
   apiFetch<{ success: boolean }>(`/api/teams?id=${id}`, { method: 'DELETE' })
 
+export const getTeamUsers = (teamId: string) =>
+  apiFetch<{ users: User[] }>(`/api/teams/${teamId}/users`)
+
+export const getTeamDSNs = (teamId: string) =>
+  apiFetch<{ dsns: DSN[] }>(`/api/teams/${teamId}/dsns`)
+
 export const addUserToTeam = (teamId: string, userId: string) =>
   apiFetch<{ success: boolean }>(`/api/teams/${teamId}/users`, {
     method: 'POST',

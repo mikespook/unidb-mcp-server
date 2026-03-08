@@ -109,8 +109,8 @@ func (h *TeamHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
 		return
 	}
-	if team.Name == "default" {
-		http.Error(w, `{"error":"cannot delete the default team"}`, http.StatusBadRequest)
+	if team.Name == "admin" {
+		http.Error(w, `{"error":"cannot delete the admin team"}`, http.StatusBadRequest)
 		return
 	}
 	if err := h.store.DeleteTeam(id); err != nil {
@@ -119,6 +119,42 @@ func (h *TeamHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+// GetUsers returns users in a team (GET /api/teams/{id}/users).
+func (h *TeamHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePerm(w, r, apprbac.PermTeamRead) {
+		return
+	}
+	teamID := r.PathValue("id")
+	users, err := h.store.GetTeamUsers(teamID)
+	if err != nil {
+		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
+		return
+	}
+	if users == nil {
+		users = []*store.User{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"users": users})
+}
+
+// GetDSNs returns DSNs assigned to a team (GET /api/teams/{id}/dsns).
+func (h *TeamHandler) GetDSNs(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePerm(w, r, apprbac.PermTeamRead) {
+		return
+	}
+	teamID := r.PathValue("id")
+	dsns, err := h.store.GetTeamDSNs(teamID)
+	if err != nil {
+		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
+		return
+	}
+	if dsns == nil {
+		dsns = []*store.DSN{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"dsns": dsns})
 }
 
 // AddUser assigns a user to a team (POST /api/teams/{id}/users).

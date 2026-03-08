@@ -14,6 +14,7 @@ import DsnInfoModal from './components/DsnInfoModal.vue'
 import BridgeEditModal from './components/BridgeEditModal.vue'
 import BridgeTipsModal from './components/BridgeTipsModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
+import AccessManagementModal from './components/AccessManagementModal.vue'
 
 const { isAuthenticated, needsInit, checkAuth, logout } = useAuth()
 
@@ -39,6 +40,7 @@ const tipsName = ref('')
 const tipsSecret = ref('')
 
 const showChangePasswordModal = ref(false)
+const showAccessManagementModal = ref(false)
 
 onMounted(async () => {
   await checkAuth()
@@ -178,6 +180,7 @@ async function handleDeleteBridge(name: string) {
   <template v-else-if="isAuthenticated">
     <AppHeader
       @change-password="showChangePasswordModal = true"
+      @access-management="showAccessManagementModal = true"
       @logout="handleLogout"
     />
 
@@ -237,6 +240,11 @@ async function handleDeleteBridge(name: string) {
     <ChangePasswordModal
       v-if="showChangePasswordModal"
       @close="showChangePasswordModal = false"
+    />
+
+    <AccessManagementModal
+      v-if="showAccessManagementModal"
+      @close="showAccessManagementModal = false"
     />
   </template>
 </template>
