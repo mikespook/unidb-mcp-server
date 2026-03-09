@@ -10,7 +10,7 @@ RUN npm run build
 # Backend build stage
 FROM golang:1.26-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/backend
 
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev
@@ -19,14 +19,11 @@ RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY . .
-
-# Copy frontend dist from frontend-builder
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# Copy backend source
+COPY backend/ .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o unidb-mcp-server ./backend/cmd/mcp-server
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /app/unidb-mcp-server ./cmd/mcp-server
 
 # Runtime stage
 FROM alpine:latest
@@ -44,7 +41,7 @@ RUN addgroup -g 1000 appgroup && \
 COPY --from=builder /app/unidb-mcp-server .
 
 # Copy frontend dist
-COPY --from=builder /app/frontend/dist ./frontend/dist
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with proper ownership
 RUN mkdir -p /app/data && \
