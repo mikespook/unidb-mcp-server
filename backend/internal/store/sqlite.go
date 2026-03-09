@@ -693,6 +693,32 @@ func (s *Store) GetDSNTeams(dsnID string) ([]*Team, error) {
 }
 
 // GetTeamDSNs returns all DSNs assigned to a team.
+// ListDSNsForUser returns the distinct DSNs accessible to a user via their team memberships.
+func (s *Store) ListDSNsForUser(userID string) ([]*DSN, error) {
+	rows, err := s.db.Query(
+		`SELECT DISTINCT d.id, d.name, d.driver, d.dsn, d.created_at, d.updated_at
+		 FROM dsns d
+		 JOIN dsn_teams dt ON d.id = dt.dsn_id
+		 JOIN user_teams ut ON dt.team_id = ut.team_id
+		 WHERE ut.user_id = ?
+		 ORDER BY d.name`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var dsns []*DSN
+	for rows.Next() {
+		d := &DSN{}
+		if err := rows.Scan(&d.ID, &d.Name, &d.Driver, &d.DSN, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		dsns = append(dsns, d)
+	}
+	return dsns, rows.Err()
+}
+
 func (s *Store) GetTeamDSNs(teamID string) ([]*DSN, error) {
 	rows, err := s.db.Query(
 		`SELECT d.id, d.name, d.driver, d.dsn, d.created_at, d.updated_at FROM dsns d JOIN dsn_teams dt ON d.id = dt.dsn_id WHERE dt.team_id = ? ORDER BY d.name`,

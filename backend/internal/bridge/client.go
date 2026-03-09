@@ -110,11 +110,6 @@ func (c *Client) Start() error {
 
 // connectAndListen establishes SSE connection and listens for commands
 func (c *Client) connectAndListen() error {
-	// Register with UniDB server first
-	if err := c.register(); err != nil {
-		return fmt.Errorf("failed to register: %w", err)
-	}
-
 	// Connect to SSE endpoint
 	sseURL := fmt.Sprintf("%s/sse?name=%s&secret=%s", 
 		c.config.UniDBURL, 
@@ -142,44 +137,6 @@ func (c *Client) connectAndListen() error {
 	}
 
 	return c.readSSE(resp.Body)
-}
-
-// register registers the bridge with UniDB server
-func (c *Client) register() error {
-	registerURL := fmt.Sprintf("%s/api/bridges/register", c.config.UniDBURL)
-	
-	payload := map[string]string{
-		"name":   c.config.Name,
-		"secret": c.config.Secret,
-		"type":   "sqlite",
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", registerURL, bytes.NewReader(jsonData))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.config.Secret)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("registration failed: %s - %s", resp.Status, string(body))
-	}
-
-	return nil
 }
 
 // readSSE reads SSE events and processes MCP commands

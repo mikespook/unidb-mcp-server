@@ -92,11 +92,13 @@ func (h *UIHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	initAdminID, _ := h.store.GetInitialUserID()
+	isAdmin, _ := h.store.IsUserAdmin(u.ID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"authenticated": true,
 		"username":      u.Username,
 		"init_admin_id": initAdminID,
+		"is_admin":      isAdmin,
 	})
 }
 
@@ -207,12 +209,20 @@ func (h *UIHandler) Index(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, h.frontendPath+"/index.html")
 }
 
-// ListDSNs returns all DSN configurations
+// ListDSNs returns DSN configurations. Admins see all; members see only DSNs in their teams.
 func (h *UIHandler) ListDSNs(w http.ResponseWriter, r *http.Request) {
 	if !h.requirePerm(w, r, apprbac.PermDSNRead) {
 		return
 	}
-	dsns, err := h.store.List()
+	u, _ := h.sessionUser(r)
+	isAdmin, _ := h.store.IsUserAdmin(u.ID)
+	var dsns []*store.DSN
+	var err error
+	if isAdmin {
+		dsns, err = h.store.List()
+	} else {
+		dsns, err = h.store.ListDSNsForUser(u.ID)
+	}
 	if err != nil {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return

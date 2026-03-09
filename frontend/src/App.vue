@@ -15,7 +15,7 @@ import BridgeTipsModal from './components/BridgeTipsModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import AccessManagementModal from './components/AccessManagementModal.vue'
 
-const { isAuthenticated, needsInit, initAdminId, checkAuth, logout } = useAuth()
+const { isAuthenticated, needsInit, initAdminId, isAdmin, checkAuth, logout } = useAuth()
 
 async function onInitComplete() {
   await checkAuth()
@@ -149,6 +149,7 @@ function openBridgeTips(name: string, secret: string) {
 
   <template v-else-if="isAuthenticated">
     <AppHeader
+      :is-admin="isAdmin"
       @change-password="showChangePasswordModal = true"
       @access-management="showAccessManagementModal = true"
       @logout="handleLogout"
