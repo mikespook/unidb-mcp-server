@@ -507,6 +507,15 @@ func (s *Store) IsInitialized() (bool, error) {
 	return count > 0, nil
 }
 
+// GetInitialUserID returns the ID of the initial admin user recorded at setup time.
+func (s *Store) GetInitialUserID() (string, error) {
+	id, err := s.GetSetting("init_admin_user_id")
+	if err != nil {
+		return "", ErrUserNotFound
+	}
+	return id, nil
+}
+
 // CreateUser inserts a new user record.
 func (s *Store) CreateUser(username, passwordHash, jwtSecret, role string) (*User, error) {
 	id := uuid.New().String()

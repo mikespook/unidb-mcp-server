@@ -167,6 +167,12 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"cannot delete yourself"}`, http.StatusBadRequest)
 		return
 	}
+	// Block deletion of the initial user
+	initialID, err := h.store.GetInitialUserID()
+	if err == nil && id == initialID {
+		http.Error(w, `{"error":"cannot delete the initial admin user"}`, http.StatusBadRequest)
+		return
+	}
 	if err := h.store.DeleteUser(id); err != nil {
 		if err == store.ErrUserNotFound {
 			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)

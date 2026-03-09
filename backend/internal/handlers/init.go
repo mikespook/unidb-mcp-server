@@ -84,6 +84,9 @@ func (h *InitHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record the initial admin user ID so it can never be deleted
+	_ = h.store.SetSetting("init_admin_user_id", user.ID)
+
 	// Seed default teams; add admin user to the admin team
 	for _, name := range []string{"admin", "team1", "team2"} {
 		t, err := h.store.CreateTeam(name)

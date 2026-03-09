@@ -16,7 +16,7 @@ import BridgeTipsModal from './components/BridgeTipsModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import AccessManagementModal from './components/AccessManagementModal.vue'
 
-const { isAuthenticated, needsInit, checkAuth, logout } = useAuth()
+const { isAuthenticated, needsInit, initAdminId, checkAuth, logout } = useAuth()
 
 async function onInitComplete() {
   await checkAuth()
@@ -244,6 +244,7 @@ async function handleDeleteBridge(name: string) {
 
     <AccessManagementModal
       v-if="showAccessManagementModal"
+      :init-admin-id="initAdminId"
       @close="showAccessManagementModal = false"
     />
   </template>

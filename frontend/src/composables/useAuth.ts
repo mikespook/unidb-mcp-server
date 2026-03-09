@@ -5,6 +5,7 @@ const isAuthenticated = ref(false)
 const needsInit = ref(false)
 const username = ref('')
 const role = ref('')
+const initAdminId = ref('')
 
 export function useAuth() {
   async function checkAuth() {
@@ -20,6 +21,7 @@ export function useAuth() {
       isAuthenticated.value = me.authenticated
       username.value = me.username ?? ''
       role.value = me.role ?? ''
+      initAdminId.value = me.init_admin_id ?? ''
     } catch {
       isAuthenticated.value = false
     }
@@ -31,6 +33,7 @@ export function useAuth() {
     isAuthenticated.value = true
     username.value = me.username ?? ''
     role.value = me.role ?? ''
+    initAdminId.value = me.init_admin_id ?? ''
   }
 
   async function logout() {
@@ -38,7 +41,8 @@ export function useAuth() {
     isAuthenticated.value = false
     username.value = ''
     role.value = ''
+    initAdminId.value = ''
   }
 
-  return { isAuthenticated, needsInit, username, role, checkAuth, login, logout }
+  return { isAuthenticated, needsInit, username, role, initAdminId, checkAuth, login, logout }
 }

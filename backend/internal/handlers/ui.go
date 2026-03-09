@@ -67,11 +67,13 @@ func (h *UIHandler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
+	initAdminID, _ := h.store.GetInitialUserID()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"authenticated": true,
-		"username":      u.Username,
-		"role":          u.Role,
+		"authenticated":   true,
+		"username":        u.Username,
+		"role":            u.Role,
+		"init_admin_id":   initAdminID,
 	})
 }
 

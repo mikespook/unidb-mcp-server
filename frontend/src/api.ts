@@ -22,7 +22,7 @@ export const initSetup = (username: string, password: string, jwtSecret?: string
 
 // Auth
 export const checkAuth = () =>
-  apiFetch<{ authenticated: boolean; username?: string; role?: string }>('/api/ui/me')
+  apiFetch<{ authenticated: boolean; username?: string; role?: string; init_admin_id?: string }>('/api/ui/me')
 
 export const login = (username: string, password: string) =>
   apiFetch<{ success: boolean }>('/login', {
