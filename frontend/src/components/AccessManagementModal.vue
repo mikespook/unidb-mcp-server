@@ -101,6 +101,15 @@ async function openManageDSNs(team: Team) {
 }
 
 async function toggleUser(userId: string) {
+  // Prevent removing the initial admin from the admin team
+  if (
+    selectedTeam.value?.name === 'admin' &&
+    userId === props.initAdminId &&
+    teamUserIds.value.has(userId)
+  ) {
+    error.value = 'Cannot remove the initial admin user from the admin team'
+    return
+  }
   error.value = ''
   try {
     if (teamUserIds.value.has(userId)) {
@@ -362,7 +371,13 @@ function switchTab(t: Tab) {
           <ul v-else class="member-list">
             <li v-for="user in allUsers" :key="user.id" class="member-item">
               <label>
-                <input type="checkbox" :checked="teamUserIds.has(user.id)" @change="toggleUser(user.id)" />
+                <input
+                  type="checkbox"
+                  :checked="teamUserIds.has(user.id)"
+                  :disabled="selectedTeam?.name === 'admin' && user.id === props.initAdminId"
+                  :title="selectedTeam?.name === 'admin' && user.id === props.initAdminId ? 'Cannot remove the initial admin from the admin team' : ''"
+                  @change="toggleUser(user.id)"
+                />
                 <span class="member-name">{{ user.username }}</span>
               </label>
             </li>
