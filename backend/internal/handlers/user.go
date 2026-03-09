@@ -43,7 +43,12 @@ func (h *UserHandler) requirePerm(w http.ResponseWriter, r *http.Request, perm s
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return nil, false
 	}
-	if !apprbac.IsGranted(h.rbac, u.Role, perm) {
+	isAdmin, _ := h.store.IsUserAdmin(u.ID)
+	role := "member"
+	if isAdmin {
+		role = "admin"
+	}
+	if !apprbac.IsGranted(h.rbac, role, perm) {
 		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 		return nil, false
 	}
@@ -72,17 +77,9 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
-		Role     string `json:"role"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
 		http.Error(w, `{"error":"username and password required"}`, http.StatusBadRequest)
-		return
-	}
-	if req.Role == "" {
-		req.Role = "member"
-	}
-	if req.Role != "admin" && req.Role != "member" {
-		http.Error(w, `{"error":"role must be admin or member"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -99,7 +96,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.CreateUser(req.Username, string(hash), jwtSecret, req.Role)
+	user, err := h.store.CreateUser(req.Username, string(hash), jwtSecret)
 	if err != nil {
 		if err == store.ErrUserExists {
 			http.Error(w, `{"error":"username already exists"}`, http.StatusConflict)

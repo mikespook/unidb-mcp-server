@@ -74,7 +74,7 @@ func (h *InitHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.CreateUser(req.Username, string(hash), jwtSecret, "admin")
+	user, err := h.store.CreateUser(req.Username, string(hash), jwtSecret)
 	if err != nil {
 		if err == store.ErrUserExists {
 			http.Error(w, `{"error":"username already exists"}`, http.StatusConflict)

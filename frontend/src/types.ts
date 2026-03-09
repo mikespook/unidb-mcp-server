@@ -13,17 +13,7 @@ export interface DSN {
   name: string
   driver: DriverName
   dsn: string
-  created_at: string
-  updated_at: string
-}
-
-export interface Bridge {
-  id: string
-  name: string
-  type: string
-  connected: boolean
-  connected_at?: string
-  secret?: string
+  connected?: boolean
   created_at: string
   updated_at: string
 }

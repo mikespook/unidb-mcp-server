@@ -4,31 +4,26 @@ import gorbac "github.com/mikespook/gorbac/v3"
 
 // Permission IDs
 const (
-	PermDSNRead     = "dsn:read"
-	PermDSNWrite    = "dsn:write"
-	PermDSNDelete   = "dsn:delete"
-	PermDSNTest     = "dsn:test"
-	PermBridgeRead  = "bridge:read"
-	PermBridgeWrite = "bridge:write"
-	PermBridgeDel   = "bridge:delete"
-	PermUserRead    = "user:read"
-	PermUserWrite   = "user:write"
-	PermUserDelete  = "user:delete"
-	PermTeamRead    = "team:read"
-	PermTeamWrite   = "team:write"
-	PermTeamDelete  = "team:delete"
+	PermDSNRead    = "dsn:read"
+	PermDSNWrite   = "dsn:write"
+	PermDSNDelete  = "dsn:delete"
+	PermDSNTest    = "dsn:test"
+	PermUserRead   = "user:read"
+	PermUserWrite  = "user:write"
+	PermUserDelete = "user:delete"
+	PermTeamRead   = "team:read"
+	PermTeamWrite  = "team:write"
+	PermTeamDelete = "team:delete"
 )
 
 var allPermissions = []string{
 	PermDSNRead, PermDSNWrite, PermDSNDelete, PermDSNTest,
-	PermBridgeRead, PermBridgeWrite, PermBridgeDel,
 	PermUserRead, PermUserWrite, PermUserDelete,
 	PermTeamRead, PermTeamWrite, PermTeamDelete,
 }
 
 var memberPermissions = []string{
 	PermDSNRead, PermDSNTest,
-	PermBridgeRead,
 	PermTeamRead,
 }
 

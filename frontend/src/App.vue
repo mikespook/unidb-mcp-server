@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useConnections } from './composables/useConnections'
 import { useAlerts } from './composables/useAlerts'
-import type { DSN, Bridge } from './types'
+import type { DSN } from './types'
 
 import InitWizard from './components/InitWizard.vue'
 import LoginScreen from './components/LoginScreen.vue'
@@ -11,7 +11,6 @@ import AppHeader from './components/AppHeader.vue'
 import ConnectionsTable from './components/ConnectionsTable.vue'
 import DsnModal from './components/DsnModal.vue'
 import DsnInfoModal from './components/DsnInfoModal.vue'
-import BridgeEditModal from './components/BridgeEditModal.vue'
 import BridgeTipsModal from './components/BridgeTipsModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import AccessManagementModal from './components/AccessManagementModal.vue'
@@ -21,7 +20,7 @@ const { isAuthenticated, needsInit, initAdminId, checkAuth, logout } = useAuth()
 async function onInitComplete() {
   await checkAuth()
 }
-const { dsns, bridges, isLoading, loadAll, createDSN, updateDSN, deleteDSN, testDSN, registerBridge, updateBridge, deleteBridge } = useConnections()
+const { dsns, isLoading, loadAll, createDSN, updateDSN, deleteDSN, testDSN } = useConnections()
 const { alerts, showAlert } = useAlerts()
 
 // Modal state
@@ -30,10 +29,7 @@ const editingDsn = ref<DSN | null>(null)
 
 const showInfoModal = ref(false)
 const infoDriver = ref('')
-const infoDsn = ref('')
-
-const showBridgeEditModal = ref(false)
-const editingBridge = ref<Bridge | null>(null)
+const infoDsnStr = ref('')
 
 const showBridgeTipsModal = ref(false)
 const tipsName = ref('')
@@ -69,21 +65,25 @@ function openEditDsn(dsn: DSN) {
 
 async function handleSaveDsn(payload: { id?: string; name: string; driver: string; dsn: string; secret?: string }) {
   try {
-    if (payload.driver === 'sqlite-bridge') {
-      await registerBridge(payload.name, payload.secret!, 'sqlite')
+    const dsnValue = payload.driver === 'sqlite-bridge' ? payload.secret! : payload.dsn
+    if (payload.id) {
+      await updateDSN(payload.id, payload.name, payload.driver, dsnValue)
       showDsnModal.value = false
       await loadAll()
-      openBridgeTips(payload.name, payload.secret!)
-    } else if (payload.id) {
-      await updateDSN(payload.id, payload.name, payload.driver, payload.dsn)
-      showAlert('DSN updated successfully', 'success')
-      showDsnModal.value = false
-      loadAll()
+      if (payload.driver === 'sqlite-bridge') {
+        openBridgeTips(payload.name, payload.secret!)
+      } else {
+        showAlert('DSN updated successfully', 'success')
+      }
     } else {
-      await createDSN(payload.name, payload.driver, payload.dsn)
-      showAlert('DSN added successfully', 'success')
+      await createDSN(payload.name, payload.driver, dsnValue)
       showDsnModal.value = false
-      loadAll()
+      await loadAll()
+      if (payload.driver === 'sqlite-bridge') {
+        openBridgeTips(payload.name, payload.secret!)
+      } else {
+        showAlert('DSN added successfully', 'success')
+      }
     }
   } catch (e: unknown) {
     const err = e as { error?: string }
@@ -122,51 +122,21 @@ async function handleTestDsn(id: string, name: string, btn: HTMLButtonElement) {
   }
 }
 
-// Info modal
-function openInfoModal(driver: string, dsn: string) {
-  infoDriver.value = driver
-  infoDsn.value = dsn
-  showInfoModal.value = true
+// Info modal — routes to BridgeTipsModal for sqlite-bridge, DsnInfoModal for others
+function handleInfoDsn(dsn: DSN) {
+  if (dsn.driver === 'sqlite-bridge') {
+    openBridgeTips(dsn.name, dsn.dsn)
+  } else {
+    infoDriver.value = dsn.driver
+    infoDsnStr.value = dsn.dsn
+    showInfoModal.value = true
+  }
 }
 
-// Bridge actions
 function openBridgeTips(name: string, secret: string) {
   tipsName.value = name
   tipsSecret.value = secret
   showBridgeTipsModal.value = true
-}
-
-function openBridgeEdit(bridge: Bridge) {
-  editingBridge.value = bridge
-  showBridgeEditModal.value = true
-}
-
-async function handleSaveBridge(payload: { oldName: string; name: string; secret: string }) {
-  if (!payload.name || !payload.secret) {
-    showAlert('Name and secret are required', 'error')
-    return
-  }
-  try {
-    await updateBridge(payload.oldName, payload.name, payload.secret)
-    showBridgeEditModal.value = false
-    await loadAll()
-    openBridgeTips(payload.name, payload.secret)
-  } catch (e: unknown) {
-    const err = e as { error?: string }
-    showAlert(err?.error || 'Update failed', 'error')
-  }
-}
-
-async function handleDeleteBridge(name: string) {
-  if (!confirm(`Are you sure you want to delete bridge "${name}"?`)) return
-  try {
-    await deleteBridge(name)
-    showAlert('Bridge deleted successfully', 'success')
-    loadAll()
-  } catch (e: unknown) {
-    const err = e as { error?: string }
-    showAlert(err?.error || 'Delete failed', 'error')
-  }
 }
 </script>
 
@@ -195,16 +165,12 @@ async function handleDeleteBridge(name: string) {
 
       <ConnectionsTable
         :dsns="dsns"
-        :bridges="bridges"
         :is-loading="isLoading"
         @add-dsn="openAddDsn"
         @edit-dsn="openEditDsn"
-        @info-dsn="openInfoModal"
+        @info-dsn="handleInfoDsn"
         @delete-dsn="handleDeleteDsn"
         @test-dsn="handleTestDsn"
-        @edit-bridge="openBridgeEdit"
-        @tips-bridge="b => openBridgeTips(b.name, b.secret ?? '')"
-        @delete-bridge="handleDeleteBridge"
       />
     </div>
 
@@ -219,15 +185,8 @@ async function handleDeleteBridge(name: string) {
     <DsnInfoModal
       v-if="showInfoModal"
       :driver="infoDriver"
-      :dsn="infoDsn"
+      :dsn="infoDsnStr"
       @close="showInfoModal = false"
-    />
-
-    <BridgeEditModal
-      v-if="showBridgeEditModal"
-      :bridge="editingBridge"
-      @save="handleSaveBridge"
-      @close="showBridgeEditModal = false"
     />
 
     <BridgeTipsModal

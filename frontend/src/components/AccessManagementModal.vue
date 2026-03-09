@@ -25,6 +25,7 @@ const loadingDetail = ref(false)
 
 // User management
 const users = ref<User[]>([])
+const userTeams = ref<Record<string, Team[]>>({}) // userId -> teams
 const loadingUsers = ref(false)
 const userForm = ref<{ username: string; password: string; teamIds: string[] }>({ username: '', password: '', teamIds: [] })
 const editingUser = ref<User | null>(null)
@@ -153,8 +154,21 @@ async function loadUsers() {
   loadingUsers.value = true
   error.value = ''
   try {
-    const ur = await api.listUsers()
+    const [ur, teamList] = await Promise.all([api.listUsers(), api.listTeams()])
     users.value = ur.users ?? []
+    const allTeams = teamList.teams ?? []
+    // Fetch membership for all teams in parallel, build userId -> Team[] map
+    const teamMemberships = await Promise.all(
+      allTeams.map(t => api.getTeamUsers(t.id).then(r => ({ team: t, userIds: (r.users ?? []).map(u => u.id) })))
+    )
+    const map: Record<string, Team[]> = {}
+    for (const { team, userIds } of teamMemberships) {
+      for (const uid of userIds) {
+        if (!map[uid]) map[uid] = []
+        map[uid].push(team)
+      }
+    }
+    userTeams.value = map
   } catch {
     error.value = 'Failed to load users'
   } finally {
@@ -181,7 +195,7 @@ async function handleSaveUser() {
     return
   }
   try {
-    const res = await api.createUser(userForm.value.username, userForm.value.password, 'member')
+    const res = await api.createUser(userForm.value.username, userForm.value.password)
     // Assign selected teams
     await Promise.all(userForm.value.teamIds.map(tid => api.addUserToTeam(tid, res.user.id)))
     // Show JWT secret once
@@ -296,9 +310,19 @@ function switchTab(t: Tab) {
               <tr v-for="team in teams" :key="team.id">
                 <td class="team-name">{{ team.name }}</td>
                 <td class="team-actions">
-                  <button class="btn btn-sm" @click="openManageUsers(team)">Manage Users</button>
-                  <button class="btn btn-sm" @click="openManageDSNs(team)">Manage DSNs</button>
-                  <button class="btn btn-sm btn-danger" @click="handleDeleteTeam(team)" title="Delete team">✕</button>
+                  <button class="btn btn-primary icon-btn" title="Manage Users" @click="openManageUsers(team)">👥</button>
+                  <button
+                    class="btn btn-primary icon-btn"
+                    :disabled="team.name === 'admin'"
+                    :title="team.name === 'admin' ? 'Admin team has access to all DSNs' : 'Manage DSNs'"
+                    @click="openManageDSNs(team)"
+                  >🗄️</button>
+                  <button
+                    class="btn btn-danger icon-btn"
+                    :disabled="team.name === 'admin'"
+                    :title="team.name === 'admin' ? 'Cannot delete the admin team' : 'Delete team'"
+                    @click="handleDeleteTeam(team)"
+                  >❌</button>
                 </td>
               </tr>
               <tr v-if="teams.length === 0">
@@ -316,7 +340,6 @@ function switchTab(t: Tab) {
               <label>
                 <input type="checkbox" :checked="teamUserIds.has(user.id)" @change="toggleUser(user.id)" />
                 <span class="member-name">{{ user.username }}</span>
-                <span class="member-role">{{ user.role }}</span>
               </label>
             </li>
             <li v-if="allUsers.length === 0" class="empty">No users found.</li>
@@ -339,7 +362,7 @@ function switchTab(t: Tab) {
         </div>
 
         <div v-if="teamView === 'list'" class="modal-footer">
-          <button class="btn btn-primary" @click="handleCreateTeam">+ New Team</button>
+          <button class="btn btn-primary" @click="handleCreateTeam">+ Add Team</button>
         </div>
       </template>
 
@@ -379,21 +402,17 @@ function switchTab(t: Tab) {
               <div class="user-row">
                 <div class="user-info">
                   <span class="member-name">{{ user.username }}</span>
-                  <span class="member-role">{{ user.role }}</span>
+                  <span v-for="t in (userTeams[user.id] ?? [])" :key="t.id" class="team-badge">{{ t.name }}</span>
                 </div>
                 <div class="user-actions">
-                  <button class="btn btn-sm" @click="revealJWTSecret(user.id)" title="Show/hide JWT secret">
-                    {{ jwtSecretVisible[user.id] ? 'Hide JWT' : 'JWT Secret' }}
-                  </button>
-                  <button class="btn btn-sm" @click="openEditPassword(user.id)" title="Change password">
-                    Password
-                  </button>
+                  <button class="btn btn-primary icon-btn" @click="revealJWTSecret(user.id)" :title="jwtSecretVisible[user.id] ? 'Hide JWT secret' : 'Show JWT secret'">🔑</button>
+                  <button class="btn btn-primary icon-btn" @click="openEditPassword(user.id)" title="Change password">📝</button>
                   <button
-                    class="btn btn-sm btn-danger"
+                    class="btn btn-danger icon-btn"
                     :disabled="user.id === props.initAdminId"
                     :title="user.id === props.initAdminId ? 'Cannot delete the initial admin user' : 'Delete user'"
                     @click="handleDeleteUser(user)"
-                  >✕</button>
+                  >❌</button>
                 </div>
               </div>
               <!-- Inline password edit -->
@@ -406,7 +425,7 @@ function switchTab(t: Tab) {
                   @keydown.enter="handleSavePassword(user.id)"
                   @keydown.esc="cancelEditPassword"
                 />
-                <button class="btn btn-sm btn-primary" @click="handleSavePassword(user.id)">Save</button>
+                <button class="btn btn-sm btn-primary" @click="handleSavePassword(user.id)">Save Password</button>
                 <button class="btn btn-sm" @click="cancelEditPassword">Cancel</button>
               </div>
               <!-- JWT secret reveal -->
@@ -420,7 +439,7 @@ function switchTab(t: Tab) {
         </div>
 
         <div v-if="!showUserForm" class="modal-footer">
-          <button class="btn btn-primary" @click="openAddUser">+ New User</button>
+          <button class="btn btn-primary" @click="openAddUser">+ Add User</button>
         </div>
       </template>
     </div>
@@ -537,14 +556,10 @@ function switchTab(t: Tab) {
 .team-checkbox-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
 .no-teams { font-size: 0.85rem; color: #aaa; }
 
+.team-badge { font-size: 0.72rem; background: #e8f4fd; color: #1976d2; padding: 2px 7px; border-radius: 10px; }
+
 /* Buttons */
-.btn { padding: 6px 14px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; border: 1px solid #ddd; background: white; color: #333; }
-.btn:hover { background: #f5f5f5; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
-.btn-primary { background: #0f3460; color: white; border-color: #0f3460; font-weight: 600; }
-.btn-primary:hover { background: #1a4a80; }
-.btn-danger { color: #c00; border-color: #ffcccc; }
-.btn-danger:hover { background: #fff0f0; }
 
 .modal-footer { padding: 10px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; flex-shrink: 0; }
 </style>

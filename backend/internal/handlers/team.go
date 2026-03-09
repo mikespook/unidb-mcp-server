@@ -30,11 +30,14 @@ func (h *TeamHandler) currentUserRole(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	u, err := h.store.GetUser(userID)
+	isAdmin, err := h.store.IsUserAdmin(userID)
 	if err != nil {
 		return "", err
 	}
-	return u.Role, nil
+	if isAdmin {
+		return "admin", nil
+	}
+	return "member", nil
 }
 
 func (h *TeamHandler) requirePerm(w http.ResponseWriter, r *http.Request, perm string) bool {
@@ -110,7 +113,7 @@ func (h *TeamHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if team.Name == "admin" {
-		http.Error(w, `{"error":"cannot delete the admin team"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"cannot delete the admin team"}`, http.StatusForbidden)
 		return
 	}
 	if err := h.store.DeleteTeam(id); err != nil {
@@ -199,12 +202,29 @@ func (h *TeamHandler) RemoveUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// requireNotAdminTeam returns false and writes a 400 error if the team is the admin team.
+func (h *TeamHandler) requireNotAdminTeam(w http.ResponseWriter, teamID string) bool {
+	team, err := h.store.GetTeam(teamID)
+	if err != nil {
+		http.Error(w, `{"error":"team not found"}`, http.StatusNotFound)
+		return false
+	}
+	if team.Name == "admin" {
+		http.Error(w, `{"error":"admin team has access to all DSNs and cannot be modified"}`, http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
 // AddDSN assigns a DSN to a team (POST /api/teams/{id}/dsns).
 func (h *TeamHandler) AddDSN(w http.ResponseWriter, r *http.Request) {
 	if !h.requirePerm(w, r, apprbac.PermTeamWrite) {
 		return
 	}
 	teamID := r.PathValue("id")
+	if !h.requireNotAdminTeam(w, teamID) {
+		return
+	}
 	var req struct {
 		DSNID string `json:"dsn_id"`
 	}
@@ -226,6 +246,9 @@ func (h *TeamHandler) RemoveDSN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	teamID := r.PathValue("id")
+	if !h.requireNotAdminTeam(w, teamID) {
+		return
+	}
 	var req struct {
 		DSNID string `json:"dsn_id"`
 	}

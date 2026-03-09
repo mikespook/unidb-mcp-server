@@ -1,4 +1,4 @@
-import type { DSN, Bridge } from './types'
+import type { DSN } from './types'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -22,7 +22,7 @@ export const initSetup = (username: string, password: string, jwtSecret?: string
 
 // Auth
 export const checkAuth = () =>
-  apiFetch<{ authenticated: boolean; username?: string; role?: string; init_admin_id?: string }>('/api/ui/me')
+  apiFetch<{ authenticated: boolean; username?: string; init_admin_id?: string }>('/api/ui/me')
 
 export const login = (username: string, password: string) =>
   apiFetch<{ success: boolean }>('/login', {
@@ -63,32 +63,10 @@ export const testDSN = (id: string) =>
     method: 'POST',
   })
 
-// Bridges
-export const listBridges = () =>
-  apiFetch<{ bridges: Bridge[] }>('/api/bridges')
-
-export const registerBridge = (name: string, secret: string, type: string) =>
-  apiFetch<{ success: boolean; bridge: Bridge }>('/api/bridges/register', {
-    method: 'POST',
-    body: JSON.stringify({ name, secret, type }),
-  })
-
-export const updateBridge = (oldName: string, name: string, secret: string) =>
-  apiFetch<{ success: boolean; bridge: Bridge }>(`/api/bridges?name=${encodeURIComponent(oldName)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ name, secret }),
-  })
-
-export const deleteBridge = (name: string) =>
-  apiFetch<{ success: boolean }>(`/api/bridges?name=${encodeURIComponent(name)}`, {
-    method: 'DELETE',
-  })
-
 // Users
 export interface User {
   id: string
   username: string
-  role: string
   created_at: string
   updated_at: string
 }
@@ -96,10 +74,10 @@ export interface User {
 export const listUsers = () =>
   apiFetch<{ users: User[] }>('/api/users')
 
-export const createUser = (username: string, password: string, role: string) =>
+export const createUser = (username: string, password: string) =>
   apiFetch<{ success: boolean; user: User; jwt_secret: string }>('/api/users', {
     method: 'POST',
-    body: JSON.stringify({ username, password, role }),
+    body: JSON.stringify({ username, password }),
   })
 
 export const updateUserPassword = (id: string, password: string) =>

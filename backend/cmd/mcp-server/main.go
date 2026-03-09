@@ -50,12 +50,11 @@ func main() {
 	bridgeManager := handlers.NewBridgeManager(s)
 
 	// Initialize handlers
-	uiHandler := handlers.NewUIHandler(s, manager, *frontendPath)
+	uiHandler := handlers.NewUIHandler(s, manager, *frontendPath, rbac, bridgeManager)
 	initHandler := handlers.NewInitHandler(s)
 	userHandler := handlers.NewUserHandler(s, rbac)
 	teamHandler := handlers.NewTeamHandler(s, rbac)
 	mcpHandler := mcp.NewHandler(s, manager)
-	bridgeHandler := handlers.NewBridgeHandler(bridgeManager)
 	sseHandler := handlers.NewSSEHandler(bridgeManager)
 
 	// Setup routes
@@ -173,21 +172,6 @@ func main() {
 	apiMux.HandleFunc("POST /teams/{id}/dsns", teamHandler.AddDSN)
 	apiMux.HandleFunc("DELETE /teams/{id}/dsns", teamHandler.RemoveDSN)
 
-	// Bridge API routes
-	apiMux.HandleFunc("/bridges/register", bridgeHandler.Register)
-	apiMux.HandleFunc("/bridges", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			bridgeHandler.List(w, r)
-		case http.MethodPut:
-			bridgeHandler.Update(w, r)
-		case http.MethodDelete:
-			bridgeHandler.Delete(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
 	// Apply middleware chain to API routes
 	apiHandler := possum.Chain(
 		apiMux.ServeHTTP,
@@ -257,7 +241,7 @@ func jwtMiddleware(s *store.Store) possum.HandlerFunc {
 
 // isPublicPath checks if the path should be accessible without JWT authentication
 func isPublicPath(path string) bool {
-	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/ui/init-status", "/bridges/register"}
+	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/ui/init-status"}
 	for _, p := range publicPaths {
 		if path == p || strings.HasPrefix(path, p) {
 			return true

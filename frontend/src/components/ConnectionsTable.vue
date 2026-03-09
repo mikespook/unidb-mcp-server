@@ -1,20 +1,16 @@
 <script setup lang="ts">
-import type { DSN, Bridge } from '../types'
+import type { DSN } from '../types'
 
 defineProps<{
   dsns: DSN[]
-  bridges: Bridge[]
   isLoading: boolean
 }>()
 
 const emit = defineEmits<{
   testDsn: [id: string, name: string, btn: HTMLButtonElement]
   editDsn: [dsn: DSN]
-  infoDsn: [driver: string, dsn: string]
+  infoDsn: [dsn: DSN]
   deleteDsn: [id: string]
-  editBridge: [bridge: Bridge]
-  tipsBridge: [bridge: Bridge]
-  deleteBridge: [name: string]
   addDsn: []
 }>()
 
@@ -23,10 +19,6 @@ function formatDate(dateString: string) {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
-}
-
-function hasInfo(driver: string) {
-  return ['mysql', 'postgres', 'sqlite'].includes(driver)
 }
 
 async function handleTest(id: string, name: string, event: MouseEvent) {
@@ -44,7 +36,7 @@ async function handleTest(id: string, name: string, event: MouseEvent) {
 
     <div v-if="isLoading" class="loading">Loading...</div>
 
-    <div v-else-if="dsns.length === 0 && bridges.length === 0" class="empty-state">
+    <div v-else-if="dsns.length === 0" class="empty-state">
       No DSNs configured. Click "Add DSN" to get started.
     </div>
 
@@ -58,19 +50,25 @@ async function handleTest(id: string, name: string, event: MouseEvent) {
         </tr>
       </thead>
       <tbody>
-        <!-- DSN rows -->
         <tr v-for="dsn in dsns" :key="dsn.id">
           <td>{{ dsn.name }}</td>
           <td><span :class="`badge badge-${dsn.driver}`">{{ dsn.driver }}</span></td>
           <td>{{ formatDate(dsn.created_at) }}</td>
           <td>
             <button
-              v-if="hasInfo(dsn.driver)"
               class="btn btn-primary icon-btn"
-              title="Connection info"
-              @click="$emit('infoDsn', dsn.driver, dsn.dsn)"
+              title="Info / Setup tips"
+              @click="$emit('infoDsn', dsn)"
             >ℹ️</button>
             <button
+              v-if="dsn.driver === 'sqlite-bridge'"
+              class="icon-btn"
+              style="background: none; border: none; cursor: default;"
+              :title="dsn.connected ? 'Connected' : 'Disconnected'"
+              disabled
+            >{{ dsn.connected ? '🟩' : '🟥' }}</button>
+            <button
+              v-if="dsn.driver !== 'sqlite-bridge'"
               class="btn btn-success icon-btn"
               title="Test connection"
               @click="handleTest(dsn.id, dsn.name, $event)"
@@ -84,35 +82,6 @@ async function handleTest(id: string, name: string, event: MouseEvent) {
               class="btn btn-danger icon-btn"
               title="Delete"
               @click="$emit('deleteDsn', dsn.id)"
-            >❌</button>
-          </td>
-        </tr>
-        <!-- Bridge rows -->
-        <tr v-for="bridge in bridges" :key="bridge.id">
-          <td>{{ bridge.name }}</td>
-          <td><span class="badge badge-sqlite-bridge">sqlite-bridge</span></td>
-          <td>{{ formatDate(bridge.created_at) }}</td>
-          <td>
-            <button
-              class="btn btn-primary icon-btn"
-              title="Setup tips"
-              @click="$emit('tipsBridge', bridge)"
-            >ℹ️</button>
-            <button
-              class="icon-btn"
-              style="background: none; border: none; cursor: default;"
-              :title="bridge.connected ? 'Connected' : 'Disconnected'"
-              disabled
-            >{{ bridge.connected ? '🟩' : '🟥' }}</button>
-            <button
-              class="btn btn-primary icon-btn"
-              title="Edit"
-              @click="$emit('editBridge', bridge)"
-            >📝</button>
-            <button
-              class="btn btn-danger icon-btn"
-              title="Delete"
-              @click="$emit('deleteBridge', bridge.name)"
             >❌</button>
           </td>
         </tr>

@@ -10,14 +10,12 @@ import (
 )
 
 var (
-	ErrDSNNotFound    = errors.New("DSN not found")
-	ErrDSNExists      = errors.New("DSN name already exists")
-	ErrBridgeNotFound = errors.New("Bridge not found")
-	ErrBridgeExists   = errors.New("Bridge already exists")
-	ErrUserNotFound   = errors.New("user not found")
-	ErrUserExists     = errors.New("username already exists")
-	ErrTeamNotFound   = errors.New("team not found")
-	ErrTeamExists     = errors.New("team already exists")
+	ErrDSNNotFound  = errors.New("DSN not found")
+	ErrDSNExists    = errors.New("DSN name already exists")
+	ErrUserNotFound = errors.New("user not found")
+	ErrUserExists   = errors.New("username already exists")
+	ErrTeamNotFound = errors.New("team not found")
+	ErrTeamExists   = errors.New("team already exists")
 )
 
 // User represents a UI/API user
@@ -26,7 +24,6 @@ type User struct {
 	Username     string    `json:"username"`
 	PasswordHash string    `json:"-"`
 	JWTSecret    string    `json:"-"`
-	Role         string    `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -44,20 +41,9 @@ type DSN struct {
 	Name      string    `json:"name"`
 	Driver    string    `json:"driver"`
 	DSN       string    `json:"dsn"`
+	Connected bool      `json:"connected,omitempty"` // populated from in-memory state, not DB
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Bridge represents a registered SQLite bridge
-type Bridge struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Secret      string     `json:"-"` // Never expose in JSON
-	Type        string     `json:"type"`
-	Connected   bool       `json:"connected"`
-	ConnectedAt *time.Time `json:"connected_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // Store manages DSN configurations in SQLite
@@ -90,7 +76,6 @@ func (s *Store) initSchema() error {
 		username      TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL,
 		jwt_secret    TEXT NOT NULL,
-		role          TEXT NOT NULL DEFAULT 'member',
 		created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -117,16 +102,6 @@ func (s *Store) initSchema() error {
 		team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
 		PRIMARY KEY (dsn_id, team_id)
 	);
-	CREATE TABLE IF NOT EXISTS bridges (
-		id TEXT PRIMARY KEY,
-		name TEXT UNIQUE NOT NULL,
-		secret TEXT NOT NULL,
-		type TEXT NOT NULL,
-		connected INTEGER DEFAULT 0,
-		connected_at DATETIME,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
 	CREATE TABLE IF NOT EXISTS settings (
 		key   TEXT PRIMARY KEY,
 		value TEXT NOT NULL
@@ -134,7 +109,6 @@ func (s *Store) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 	CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name);
 	CREATE INDEX IF NOT EXISTS idx_dsns_name ON dsns(name);
-	CREATE INDEX IF NOT EXISTS idx_bridges_name ON bridges(name);
 	`
 	_, err := s.db.Exec(schema)
 	return err
@@ -277,168 +251,26 @@ func isUniqueConstraintError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return err.Error() == "UNIQUE constraint failed: dsns.name" || 
-		   err.Error() == "UNIQUE constraint failed: bridges.name"
+	return err.Error() == "UNIQUE constraint failed: dsns.name"
 }
 
-// Bridge methods
-
-// ListBridges returns all bridge configurations
-func (s *Store) ListBridges() ([]*Bridge, error) {
-	rows, err := s.db.Query(`SELECT id, name, secret, type, connected, connected_at, created_at, updated_at FROM bridges ORDER BY name`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var bridges []*Bridge
-	for rows.Next() {
-		bridge := &Bridge{}
-		var connectedAt sql.NullTime
-		err := rows.Scan(&bridge.ID, &bridge.Name, &bridge.Secret, &bridge.Type, &bridge.Connected, &connectedAt, &bridge.CreatedAt, &bridge.UpdatedAt)
-		if err != nil {
-			return nil, err
-		}
-		if connectedAt.Valid {
-			bridge.ConnectedAt = &connectedAt.Time
-		}
-		bridges = append(bridges, bridge)
-	}
-
-	return bridges, rows.Err()
-}
-
-// GetBridge retrieves a bridge by ID
-func (s *Store) GetBridge(id string) (*Bridge, error) {
-	bridge := &Bridge{}
-	var connectedAt sql.NullTime
+// GetByNameAndDriver retrieves a DSN by name and driver (used by SSE auth for sqlite-bridge).
+func (s *Store) GetByNameAndDriver(name, driver string) (*DSN, error) {
+	dsn := &DSN{}
 	err := s.db.QueryRow(
-		`SELECT id, name, secret, type, connected, connected_at, created_at, updated_at FROM bridges WHERE id = ?`,
-		id,
-	).Scan(&bridge.ID, &bridge.Name, &bridge.Secret, &bridge.Type, &bridge.Connected, &connectedAt, &bridge.CreatedAt, &bridge.UpdatedAt)
-
+		`SELECT id, name, driver, dsn, created_at, updated_at FROM dsns WHERE name = ? AND driver = ?`,
+		name, driver,
+	).Scan(&dsn.ID, &dsn.Name, &dsn.Driver, &dsn.DSN, &dsn.CreatedAt, &dsn.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, ErrBridgeNotFound
+		return nil, ErrDSNNotFound
 	}
-	
-	if connectedAt.Valid {
-		bridge.ConnectedAt = &connectedAt.Time
-	}
-	return bridge, err
+	return dsn, err
 }
 
-// GetBridgeByName retrieves a bridge by name
-func (s *Store) GetBridgeByName(name string) (*Bridge, error) {
-	bridge := &Bridge{}
-	var connectedAt sql.NullTime
-	err := s.db.QueryRow(
-		`SELECT id, name, secret, type, connected, connected_at, created_at, updated_at FROM bridges WHERE name = ?`,
-		name,
-	).Scan(&bridge.ID, &bridge.Name, &bridge.Secret, &bridge.Type, &bridge.Connected, &connectedAt, &bridge.CreatedAt, &bridge.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		return nil, ErrBridgeNotFound
-	}
-	
-	if connectedAt.Valid {
-		bridge.ConnectedAt = &connectedAt.Time
-	}
-	return bridge, err
-}
-
-// CreateBridge adds a new bridge configuration
-func (s *Store) CreateBridge(name, secret, bridgeType string) (*Bridge, error) {
-	id := uuid.New().String()
-	now := time.Now()
-
-	_, err := s.db.Exec(
-		`INSERT INTO bridges (id, name, secret, type, connected, connected_at, created_at, updated_at) VALUES (?, ?, ?, ?, 0, NULL, ?, ?)`,
-		id, name, secret, bridgeType, now, now,
-	)
-
-	if err != nil {
-		if isUniqueConstraintError(err) {
-			return nil, ErrBridgeExists
-		}
-		return nil, err
-	}
-
-	return &Bridge{
-		ID:        id,
-		Name:      name,
-		Secret:    secret,
-		Type:      bridgeType,
-		Connected: false,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}, nil
-}
-
-// ResetBridgeConnections marks all bridges as disconnected.
-// Called on server startup to clear stale connected state from the previous run.
-func (s *Store) ResetBridgeConnections() {
-	s.db.Exec(`UPDATE bridges SET connected = 0, updated_at = ? WHERE connected = 1`, time.Now())
-}
-
-// UpdateBridgeConnection updates the connection status of a bridge
-func (s *Store) UpdateBridgeConnection(name string, connected bool) error {
-	now := time.Now()
-	
-	var err error
-	if connected {
-		_, err = s.db.Exec(
-			`UPDATE bridges SET connected = 1, connected_at = ?, updated_at = ? WHERE name = ?`,
-			now, now, name,
-		)
-	} else {
-		_, err = s.db.Exec(
-			`UPDATE bridges SET connected = 0, updated_at = ? WHERE name = ?`,
-			now, name,
-		)
-	}
-	
+// TouchUpdatedAt bumps the updated_at timestamp for a DSN (used on bridge connect/disconnect).
+func (s *Store) TouchUpdatedAt(id string) error {
+	_, err := s.db.Exec(`UPDATE dsns SET updated_at = ? WHERE id = ?`, time.Now(), id)
 	return err
-}
-
-// UpdateBridge updates a bridge's name and secret
-func (s *Store) UpdateBridge(oldName, newName, secret string) (*Bridge, error) {
-	now := time.Now()
-	result, err := s.db.Exec(
-		`UPDATE bridges SET name = ?, secret = ?, updated_at = ? WHERE name = ?`,
-		newName, secret, now, oldName,
-	)
-	if err != nil {
-		if isUniqueConstraintError(err) {
-			return nil, ErrBridgeExists
-		}
-		return nil, err
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, err
-	}
-	if rows == 0 {
-		return nil, ErrBridgeNotFound
-	}
-	return s.GetBridgeByName(newName)
-}
-
-// DeleteBridge removes a bridge configuration
-func (s *Store) DeleteBridge(name string) error {
-	result, err := s.db.Exec(`DELETE FROM bridges WHERE name = ?`, name)
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return ErrBridgeNotFound
-	}
-
-	return nil
 }
 
 // GetSetting retrieves a setting value by key. Returns ("", sql.ErrNoRows) if not found.
@@ -497,14 +329,13 @@ func (s *Store) DeleteSetting(key string) error {
 
 // --- User methods ---
 
-// IsInitialized returns true if at least one admin user exists.
+// IsInitialized returns true if the initial admin user has been recorded in settings.
 func (s *Store) IsInitialized() (bool, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&count)
+	id, err := s.GetSetting("init_admin_user_id")
 	if err != nil {
-		return false, err
+		return false, nil
 	}
-	return count > 0, nil
+	return id != "", nil
 }
 
 // GetInitialUserID returns the ID of the initial admin user recorded at setup time.
@@ -517,12 +348,12 @@ func (s *Store) GetInitialUserID() (string, error) {
 }
 
 // CreateUser inserts a new user record.
-func (s *Store) CreateUser(username, passwordHash, jwtSecret, role string) (*User, error) {
+func (s *Store) CreateUser(username, passwordHash, jwtSecret string) (*User, error) {
 	id := uuid.New().String()
 	now := time.Now()
 	_, err := s.db.Exec(
-		`INSERT INTO users (id, username, password_hash, jwt_secret, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, username, passwordHash, jwtSecret, role, now, now,
+		`INSERT INTO users (id, username, password_hash, jwt_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		id, username, passwordHash, jwtSecret, now, now,
 	)
 	if err != nil {
 		if isUserUniqueError(err) {
@@ -530,15 +361,15 @@ func (s *Store) CreateUser(username, passwordHash, jwtSecret, role string) (*Use
 		}
 		return nil, err
 	}
-	return &User{ID: id, Username: username, PasswordHash: passwordHash, JWTSecret: jwtSecret, Role: role, CreatedAt: now, UpdatedAt: now}, nil
+	return &User{ID: id, Username: username, PasswordHash: passwordHash, JWTSecret: jwtSecret, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 // GetUser retrieves a user by ID.
 func (s *Store) GetUser(id string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, password_hash, jwt_secret, role, created_at, updated_at FROM users WHERE id = ?`, id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.JWTSecret, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+		`SELECT id, username, password_hash, jwt_secret, created_at, updated_at FROM users WHERE id = ?`, id,
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.JWTSecret, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrUserNotFound
 	}
@@ -549,8 +380,8 @@ func (s *Store) GetUser(id string) (*User, error) {
 func (s *Store) GetUserByUsername(username string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, password_hash, jwt_secret, role, created_at, updated_at FROM users WHERE username = ?`, username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.JWTSecret, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+		`SELECT id, username, password_hash, jwt_secret, created_at, updated_at FROM users WHERE username = ?`, username,
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.JWTSecret, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrUserNotFound
 	}
@@ -559,7 +390,7 @@ func (s *Store) GetUserByUsername(username string) (*User, error) {
 
 // ListUsers returns all users ordered by username.
 func (s *Store) ListUsers() ([]*User, error) {
-	rows, err := s.db.Query(`SELECT id, username, role, created_at, updated_at FROM users ORDER BY username`)
+	rows, err := s.db.Query(`SELECT id, username, created_at, updated_at FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -567,7 +398,7 @@ func (s *Store) ListUsers() ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -782,7 +613,7 @@ func (s *Store) GetUserTeams(userID string) ([]*Team, error) {
 // GetTeamUsers returns all users in a team.
 func (s *Store) GetTeamUsers(teamID string) ([]*User, error) {
 	rows, err := s.db.Query(
-		`SELECT u.id, u.username, u.role, u.created_at, u.updated_at FROM users u JOIN user_teams ut ON u.id = ut.user_id WHERE ut.team_id = ? ORDER BY u.username`,
+		`SELECT u.id, u.username, u.created_at, u.updated_at FROM users u JOIN user_teams ut ON u.id = ut.user_id WHERE ut.team_id = ? ORDER BY u.username`,
 		teamID,
 	)
 	if err != nil {
@@ -792,12 +623,22 @@ func (s *Store) GetTeamUsers(teamID string) ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+// IsUserAdmin returns true if the user is a member of the admin team.
+func (s *Store) IsUserAdmin(userID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM user_teams ut JOIN teams t ON t.id = ut.team_id WHERE ut.user_id = ? AND t.name = 'admin'`,
+		userID,
+	).Scan(&count)
+	return count > 0, err
 }
 
 // --- DSN-Team membership ---
