@@ -466,6 +466,22 @@ func (s *Store) GetUserJWTSecret(id string) (string, error) {
 	return secret, err
 }
 
+// UpdateUserJWTSecret replaces the JWT secret for a user with the given value.
+func (s *Store) UpdateUserJWTSecret(id, newSecret string) error {
+	result, err := s.db.Exec(`UPDATE users SET jwt_secret = ?, updated_at = ? WHERE id = ?`, newSecret, time.Now(), id)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 // CreateSessionWithUser stores session expiry and associated user ID.
 func (s *Store) CreateSessionWithUser(token string, expiry time.Time, userID string) error {
 	if err := s.CreateSession(token, expiry); err != nil {

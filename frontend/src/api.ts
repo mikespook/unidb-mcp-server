@@ -92,6 +92,9 @@ export const deleteUser = (id: string) =>
 export const getUserJWTSecret = (id: string) =>
   apiFetch<{ jwt_secret: string }>(`/api/users/${id}/jwt-secret`)
 
+export const refreshUserJWTSecret = (id: string) =>
+  apiFetch<{ jwt_secret: string }>(`/api/users/${id}/jwt-secret`, { method: 'POST' })
+
 // Teams
 export interface Team {
   id: string

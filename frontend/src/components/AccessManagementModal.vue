@@ -34,6 +34,19 @@ const showUserForm = ref(false)
 const showEditPassword = ref<string | null>(null) // user id being edited
 const jwtSecretVisible = ref<Record<string, string>>({}) // userId -> secret
 
+function mcpConfigExample(secret: string): string {
+  return `{
+  "mcpServers": {
+    "unidb": {
+      "url": "${window.location.origin}/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${secret}"
+      }
+    }
+  }
+}`
+}
+
 const error = ref('')
 
 onMounted(() => {
@@ -264,6 +277,17 @@ async function revealJWTSecret(userId: string) {
   }
 }
 
+async function refreshJWTSecret(userId: string) {
+  if (!confirm('Generate a new JWT secret? The old secret will stop working immediately.')) return
+  error.value = ''
+  try {
+    const res = await api.refreshUserJWTSecret(userId)
+    jwtSecretVisible.value = { ...jwtSecretVisible.value, [userId]: res.jwt_secret }
+  } catch {
+    error.value = 'Failed to refresh JWT secret'
+  }
+}
+
 function switchTab(t: Tab) {
   tab.value = t
   teamView.value = 'list'
@@ -429,9 +453,17 @@ function switchTab(t: Tab) {
                 <button class="btn btn-sm" @click="cancelEditPassword">Cancel</button>
               </div>
               <!-- JWT secret reveal -->
-              <div v-if="jwtSecretVisible[user.id]" class="jwt-reveal">
-                <code>{{ jwtSecretVisible[user.id] }}</code>
-                <button class="btn-copy-sm" @click="() => navigator.clipboard.writeText(jwtSecretVisible[user.id])" title="Copy">Copy</button>
+              <div v-if="jwtSecretVisible[user.id]" class="jwt-reveal-panel">
+                <div class="jwt-secret-row">
+                  <code class="jwt-secret-code">{{ jwtSecretVisible[user.id] }}</code>
+                  <button class="btn-copy-sm" @click="() => navigator.clipboard.writeText(jwtSecretVisible[user.id])" title="Copy secret">Copy</button>
+                  <button class="btn-copy-sm btn-danger-sm" @click="refreshJWTSecret(user.id)" title="Generate new secret">Refresh</button>
+                </div>
+                <div class="jwt-mcp-header">
+                  <span class="jwt-mcp-label">Claude Desktop Config Example</span>
+                  <button class="btn-copy-sm" @click="() => navigator.clipboard.writeText(mcpConfigExample(jwtSecretVisible[user.id]))" title="Copy config">Copy</button>
+                </div>
+                <pre class="jwt-mcp-code">{{ mcpConfigExample(jwtSecretVisible[user.id]) }}</pre>
               </div>
             </li>
             <li v-if="users.length === 0" class="empty">No users found.</li>
@@ -539,10 +571,16 @@ function switchTab(t: Tab) {
 .inline-edit { display: flex; gap: 6px; align-items: center; padding: 0 16px 10px 20px; }
 .inline-edit input { flex: 1; padding: 5px 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.85rem; }
 .inline-edit input:focus { outline: none; border-color: #0f3460; }
-.jwt-reveal { display: flex; align-items: center; gap: 8px; padding: 0 16px 10px 20px; }
-.jwt-reveal code { flex: 1; font-size: 0.78rem; font-family: monospace; color: #1a1a2e; word-break: break-all; background: #f5f5f5; padding: 5px 8px; border-radius: 4px; }
+.jwt-reveal-panel { padding: 0 16px 12px 20px; display: flex; flex-direction: column; gap: 6px; }
+.jwt-secret-row { display: flex; align-items: center; gap: 8px; }
+.jwt-secret-code { flex: 1; font-size: 0.78rem; font-family: monospace; color: #1a1a2e; word-break: break-all; background: #f5f5f5; padding: 5px 8px; border-radius: 4px; }
+.jwt-mcp-header { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.jwt-mcp-label { font-size: 0.75rem; font-weight: 600; color: #555; }
+.jwt-mcp-code { background: #1a1a2e; color: #e0e0e0; border-radius: 5px; padding: 10px 12px; font-size: 0.75rem; margin: 0; white-space: pre; overflow-x: auto; }
 .btn-copy-sm { background: #0f3460; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
 .btn-copy-sm:hover { background: #1a4a80; }
+.btn-danger-sm { background: #c0392b; }
+.btn-danger-sm:hover { background: #e74c3c; }
 
 /* User form */
 .user-form { padding: 20px; }

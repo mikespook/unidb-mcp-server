@@ -207,3 +207,34 @@ func (h *UserHandler) GetJWTSecret(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"jwt_secret": secret})
 }
+
+// RefreshJWTSecret generates a new JWT secret for a user (POST /api/users/{id}/jwt-secret).
+func (h *UserHandler) RefreshJWTSecret(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requirePerm(w, r, apprbac.PermUserWrite); !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		id = r.URL.Query().Get("id")
+	}
+	if id == "" {
+		http.Error(w, `{"error":"id required"}`, http.StatusBadRequest)
+		return
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
+		return
+	}
+	newSecret := base64.RawURLEncoding.EncodeToString(buf)
+	if err := h.store.UpdateUserJWTSecret(id, newSecret); err != nil {
+		if err == store.ErrUserNotFound {
+			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"server error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"jwt_secret": newSecret})
+}

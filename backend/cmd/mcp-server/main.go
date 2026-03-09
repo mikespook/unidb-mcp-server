@@ -151,6 +151,7 @@ func main() {
 		}
 	})
 	apiMux.HandleFunc("GET /users/{id}/jwt-secret", userHandler.GetJWTSecret)
+	apiMux.HandleFunc("POST /users/{id}/jwt-secret", userHandler.RefreshJWTSecret)
 
 	// Team management routes (session + RBAC protected inside handler)
 	apiMux.HandleFunc("/teams", func(w http.ResponseWriter, r *http.Request) {
