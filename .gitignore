@@ -43,7 +43,7 @@ docker-compose.override.yml
 build/
 
 # SQLite config database
-data/config.db
+backend/data/*
 
 # MCP configuration
 .mcp.json
