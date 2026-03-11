@@ -3,8 +3,8 @@ services:
     image: mikespook/unidb-mcp-server:latest
     ports:
       - "127.0.0.1:9093:9093"
-    env_file:
-      - .env
+    environment:
+      - ADDR=0.0.0.0:9093
     volumes:
       # Persist UniDB configuration
       - unidb-data:/app/data
