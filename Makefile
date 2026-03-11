@@ -44,27 +44,13 @@ build: clean build-frontend
 # Usage: make build-image-server
 #        make build-image-server EXTRA_TAGS="v1.0.0 v1.0"
 build-image-server:
-	@echo "Building MCP server Docker image with latest tag..."
-	docker build -f docker/Dockerfile -t mikespook/$(BINARY):latest .
-	@if [ -n "$(EXTRA_TAGS)" ]; then \
-		for tag in $(EXTRA_TAGS); do \
-			echo "Adding tag: $$tag"; \
-			docker tag mikespook/$(BINARY):latest mikespook/$(BINARY):$$tag; \
-		done; \
-	fi
+	@utils/docker-build-server.sh $(EXTRA_TAGS)
 
 # build-image-sqlite-bridge: build Docker image for the SQLite bridge with latest tag
 # Usage: make build-image-sqlite-bridge
 #        make build-image-sqlite-bridge EXTRA_TAGS="v1.0.0 v1.0"
 build-image-sqlite-bridge:
-	@echo "Building SQLite bridge Docker image with latest tag..."
-	docker build -f docker/Dockerfile.bridge -t mikespook/unidb-sqlite-bridge:latest .
-	@if [ -n "$(EXTRA_TAGS)" ]; then \
-		for tag in $(EXTRA_TAGS); do \
-			echo "Adding tag: $$tag"; \
-			docker tag mikespook/unidb-sqlite-bridge:latest mikespook/unidb-sqlite-bridge:$$tag; \
-		done; \
-	fi
+	@utils/docker-build-bridge.sh $(EXTRA_TAGS)
 
 # docker-images: build both Docker images with auto-versioned tags from docker/.tags
 # Version is auto-incremented (patch) each run, or override with VERSION=vX.Y.Z
@@ -72,40 +58,12 @@ build-image-sqlite-bridge:
 # Usage: make docker-images
 #        make docker-images VERSION=v2.0.0
 docker-images:
-	@VERSION_TO_USE=$$(if [ -n "$(VERSION)" ]; then \
-	    echo "$(VERSION)"; \
-	  else \
-	    CURRENT=$$(cat docker/.tags 2>/dev/null || echo "v0.0.0"); \
-	    MAJ=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f1); \
-	    MIN=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f2); \
-	    PAT=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f3); \
-	    echo "v$$MAJ.$$MIN.$$(( PAT + 1 ))"; \
-	  fi); \
-	  MAJ_MIN=$$(echo $$VERSION_TO_USE | sed 's/^v//' | cut -d. -f1-2); \
-	  echo "Building images: $$VERSION_TO_USE  (tags: latest, v$$MAJ_MIN, $$VERSION_TO_USE)"; \
-	  docker build -f docker/Dockerfile \
-	    -t mikespook/$(BINARY):latest \
-	    -t mikespook/$(BINARY):v$$MAJ_MIN \
-	    -t mikespook/$(BINARY):$$VERSION_TO_USE .; \
-	  docker build -f docker/Dockerfile.bridge \
-	    -t mikespook/unidb-sqlite-bridge:latest \
-	    -t mikespook/unidb-sqlite-bridge:v$$MAJ_MIN \
-	    -t mikespook/unidb-sqlite-bridge:$$VERSION_TO_USE .; \
-	  echo $$VERSION_TO_USE > docker/.tags; \
-	  echo "Done. Version $$VERSION_TO_USE saved to docker/.tags"
+	@VERSION=$(VERSION) utils/docker-images.sh
 
 # docker-push: push all tags for both images to Docker Hub
 # Reads version from docker/.tags (run 'make docker-images' first)
 docker-push:
-	@VERSION_TO_USE=$$(cat docker/.tags 2>/dev/null || { echo "Error: docker/.tags not found. Run 'make docker-images' first." >&2; exit 1; }); \
-	  MAJ_MIN=$$(echo $$VERSION_TO_USE | sed 's/^v//' | cut -d. -f1-2); \
-	  echo "Pushing mikespook/$(BINARY) and mikespook/unidb-sqlite-bridge at $$VERSION_TO_USE"; \
-	  for img in mikespook/$(BINARY) mikespook/unidb-sqlite-bridge; do \
-	    docker push $$img:latest; \
-	    docker push $$img:v$$MAJ_MIN; \
-	    docker push $$img:$$VERSION_TO_USE; \
-	  done; \
-	  echo "Push complete."
+	@utils/docker-push.sh
 
 # clean: remove build artifacts
 clean:
