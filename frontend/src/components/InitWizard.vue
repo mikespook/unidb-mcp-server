@@ -63,7 +63,7 @@ async function finish() {
 const mcpExample = computed(() => `{
   "mcpServers": {
     "unidb": {
-      "url": "http://localhost:9093/api/mcp",
+      "url": "${window.location.origin}/api/mcp",
       "headers": {
         "Authorization": "Bearer ${jwtSecret.value}"
       }
