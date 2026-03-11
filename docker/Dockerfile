@@ -33,6 +33,9 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
+# Default listen address — bind to all interfaces in container
+ENV ADDR=0.0.0.0:9093
+
 # Create non-root user for security
 RUN addgroup -g 1000 appgroup && \
     adduser -u 1000 -G appgroup -D appuser
