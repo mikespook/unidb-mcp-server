@@ -3,9 +3,11 @@ import { ref, onMounted } from 'vue'
 import * as api from '../api'
 import type { Team, User } from '../api'
 import type { DSN } from '../types'
+import { useClipboard } from '../composables/useClipboard'
 
 const props = defineProps<{ initAdminId: string }>()
 const emit = defineEmits<{ close: [] }>()
+const { copyToClipboard } = useClipboard()
 
 // Top-level tab
 type Tab = 'teams' | 'users'
@@ -471,12 +473,12 @@ function switchTab(t: Tab) {
               <div v-if="jwtSecretVisible[user.id]" class="jwt-reveal-panel">
                 <div class="jwt-secret-row">
                   <code class="jwt-secret-code">{{ jwtSecretVisible[user.id] }}</code>
-                  <button class="btn-copy-sm" @click="() => navigator.clipboard.writeText(jwtSecretVisible[user.id])" title="Copy secret">Copy</button>
+                  <button class="btn-copy-sm" @click="() => copyToClipboard(jwtSecretVisible[user.id])" title="Copy secret">Copy</button>
                   <button class="btn-copy-sm btn-danger-sm" @click="refreshJWTSecret(user.id)" title="Generate new secret">Refresh</button>
                 </div>
                 <div class="jwt-mcp-header">
                   <span class="jwt-mcp-label">Claude Desktop Config Example</span>
-                  <button class="btn-copy-sm" @click="() => navigator.clipboard.writeText(mcpConfigExample(jwtSecretVisible[user.id]))" title="Copy config">Copy</button>
+                  <button class="btn-copy-sm" @click="() => copyToClipboard(mcpConfigExample(jwtSecretVisible[user.id]))" title="Copy config">Copy</button>
                 </div>
                 <pre class="jwt-mcp-code">{{ mcpConfigExample(jwtSecretVisible[user.id]) }}</pre>
               </div>

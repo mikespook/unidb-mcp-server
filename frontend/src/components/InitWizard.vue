@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import * as api from '../api'
+import { useClipboard } from '../composables/useClipboard'
 
 const emit = defineEmits<{ complete: [] }>()
+const { copyToClipboard } = useClipboard()
 
 const step = ref(1)
 const username = ref('')
@@ -37,11 +39,11 @@ function submitStep1() {
 }
 
 function copySecret() {
-  navigator.clipboard.writeText(jwtSecret.value)
+  copyToClipboard(jwtSecret.value)
 }
 
 function copyMcpExample() {
-  navigator.clipboard.writeText(mcpExample.value)
+  copyToClipboard(mcpExample.value)
 }
 
 async function finish() {
@@ -49,7 +51,7 @@ async function finish() {
   loading.value = true
   try {
     await api.initSetup(username.value, password.value, jwtSecret.value)
-    navigator.clipboard.writeText(jwtSecret.value)
+    try { copyToClipboard(jwtSecret.value) } catch { /* best-effort */ }
     emit('complete')
   } catch (e: unknown) {
     const err = e as { error?: string }
