@@ -456,6 +456,18 @@ func (s *Store) ListAllJWTSecrets() ([]string, error) {
 	return secrets, rows.Err()
 }
 
+// GetUserByJWTSecret retrieves a user by their JWT secret.
+func (s *Store) GetUserByJWTSecret(secret string) (*User, error) {
+	u := &User{}
+	err := s.db.QueryRow(
+		`SELECT id, username, password_hash, jwt_secret, created_at, updated_at FROM users WHERE jwt_secret = ?`, secret,
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.JWTSecret, &u.CreatedAt, &u.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+	return u, err
+}
+
 // GetUserJWTSecret returns the JWT secret for a specific user.
 func (s *Store) GetUserJWTSecret(id string) (string, error) {
 	var secret string

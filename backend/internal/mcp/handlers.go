@@ -56,8 +56,10 @@ func NewHandler(s *store.Store, m *database.DriverManager) *Handler {
 	}
 }
 
-// HandleRequest processes an MCP request
-func (h *Handler) HandleRequest(req Request) Response {
+// HandleRequest processes an MCP request.
+// userID identifies the authenticated caller; empty means unauthenticated (admin bypass).
+// allowedDSNs is an optional allowlist of DSN names; empty means no restriction beyond team access.
+func (h *Handler) HandleRequest(req Request, userID string, allowedDSNs []string) Response {
 	switch req.Method {
 	case "initialize":
 		return h.handleInitialize(req.ID)
@@ -66,7 +68,7 @@ func (h *Handler) HandleRequest(req Request) Response {
 	case "tools/list":
 		return h.handleToolsList(req.ID)
 	case "tools/call":
-		return h.handleToolsCall(req.ID, req.Params)
+		return h.handleToolsCall(req.ID, req.Params, userID, allowedDSNs)
 	default:
 		return Response{
 			JSONRPC: "2.0",
@@ -110,7 +112,7 @@ func (h *Handler) handleToolsList(id interface{}) Response {
 }
 
 // handleToolsCall executes a tool
-func (h *Handler) handleToolsCall(id interface{}, params json.RawMessage) Response {
+func (h *Handler) handleToolsCall(id interface{}, params json.RawMessage, userID string, allowedDSNs []string) Response {
 	var callParams struct {
 		Name      string                 `json:"name"`
 		Arguments map[string]interface{} `json:"arguments,omitempty"`
@@ -130,9 +132,9 @@ func (h *Handler) handleToolsCall(id interface{}, params json.RawMessage) Respon
 
 	switch callParams.Name {
 	case "list_dsns":
-		return h.handleListDSNs(id)
+		return h.handleListDSNs(id, userID, allowedDSNs)
 	case "connect":
-		return h.handleConnect(id, callParams.Arguments)
+		return h.handleConnect(id, callParams.Arguments, userID, allowedDSNs)
 	case "disconnect":
 		return h.handleDisconnect(id, callParams.Arguments)
 	case "list_connections":
@@ -155,11 +157,34 @@ func (h *Handler) handleToolsCall(id interface{}, params json.RawMessage) Respon
 	}
 }
 
-// handleListDSNs lists all configured DSNs from the store
-func (h *Handler) handleListDSNs(id interface{}) Response {
-	dsns, err := h.store.List()
+// handleListDSNs lists DSNs accessible to the caller, filtered by team membership and allowlist.
+func (h *Handler) handleListDSNs(id interface{}, userID string, allowedDSNs []string) Response {
+	var dsns []*store.DSN
+	var err error
+
+	isAdmin, _ := h.store.IsUserAdmin(userID)
+	if userID == "" || isAdmin {
+		dsns, err = h.store.List()
+	} else {
+		dsns, err = h.store.ListDSNsForUser(userID)
+	}
 	if err != nil {
 		return h.internalError(id, err)
+	}
+
+	// Apply allowlist filter when provided
+	if len(allowedDSNs) > 0 {
+		allowed := make(map[string]bool, len(allowedDSNs))
+		for _, name := range allowedDSNs {
+			allowed[name] = true
+		}
+		filtered := dsns[:0]
+		for _, d := range dsns {
+			if allowed[d.Name] {
+				filtered = append(filtered, d)
+			}
+		}
+		dsns = filtered
 	}
 
 	result := make([]map[string]interface{}, 0, len(dsns))
@@ -178,7 +203,7 @@ func (h *Handler) handleListDSNs(id interface{}) Response {
 }
 
 // handleConnect handles the connect tool
-func (h *Handler) handleConnect(id interface{}, args map[string]interface{}) Response {
+func (h *Handler) handleConnect(id interface{}, args map[string]interface{}, userID string, allowedDSNs []string) Response {
 	dsnName, ok := args["dsn_name"].(string)
 	if !ok {
 		return Response{
@@ -188,6 +213,53 @@ func (h *Handler) handleConnect(id interface{}, args map[string]interface{}) Res
 				Code:    InvalidParams,
 				Message: "dsn_name is required and must be a string",
 			},
+		}
+	}
+
+	// Enforce allowlist
+	if len(allowedDSNs) > 0 {
+		allowed := false
+		for _, name := range allowedDSNs {
+			if name == dsnName {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return Response{
+				JSONRPC: "2.0",
+				ID:      id,
+				Error: &Error{
+					Code:    InvalidParams,
+					Message: fmt.Sprintf("DSN not allowed: %s", dsnName),
+				},
+			}
+		}
+	}
+
+	// Enforce team-based access for non-admin users
+	isAdmin, _ := h.store.IsUserAdmin(userID)
+	if userID != "" && !isAdmin {
+		userDSNs, err := h.store.ListDSNsForUser(userID)
+		if err != nil {
+			return h.internalError(id, err)
+		}
+		hasAccess := false
+		for _, d := range userDSNs {
+			if d.Name == dsnName {
+				hasAccess = true
+				break
+			}
+		}
+		if !hasAccess {
+			return Response{
+				JSONRPC: "2.0",
+				ID:      id,
+				Error: &Error{
+					Code:    InvalidParams,
+					Message: fmt.Sprintf("DSN not allowed: %s", dsnName),
+				},
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -122,8 +123,11 @@ func main() {
 			return
 		}
 
-		log.Printf("MCP method: %s", req.Method)
-		resp := mcpHandler.HandleRequest(req)
+		userID, _ := r.Context().Value(contextKeyUserID).(string)
+		allowedDSNs := r.URL.Query()["dsn"]
+
+		log.Printf("MCP method: %s userID: %s allowedDSNs: %v", req.Method, userID, allowedDSNs)
+		resp := mcpHandler.HandleRequest(req, userID, allowedDSNs)
 		if resp.IsNotification {
 			w.WriteHeader(http.StatusAccepted)
 			return
@@ -194,7 +198,13 @@ func main() {
 	}
 }
 
+// contextKey is a typed key for values stored in request context.
+type contextKey string
+
+const contextKeyUserID contextKey = "userID"
+
 // jwtMiddleware validates Bearer tokens against all per-user JWT secrets.
+// On success, stores the resolved userID in the request context.
 func jwtMiddleware(s *store.Store) possum.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +240,11 @@ func jwtMiddleware(s *store.Store) possum.HandlerFunc {
 					return []byte(secret), nil
 				})
 				if err == nil && token.Valid {
+					u, err := s.GetUserByJWTSecret(secret)
+					if err == nil {
+						ctx := context.WithValue(r.Context(), contextKeyUserID, u.ID)
+						r = r.WithContext(ctx)
+					}
 					next(w, r)
 					return
 				}
@@ -242,7 +257,7 @@ func jwtMiddleware(s *store.Store) possum.HandlerFunc {
 
 // isPublicPath checks if the path should be accessible without JWT authentication
 func isPublicPath(path string) bool {
-	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/mcp", "/ui/", "/ui/init-status"}
+	publicPaths := []string{"/", "/health", "/assets/", "/sse", "/ui/", "/ui/init-status"}
 	for _, p := range publicPaths {
 		if path == p || strings.HasPrefix(path, p) {
 			return true

@@ -41,7 +41,7 @@ func (h *MCPHandler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := h.handler.HandleRequest(req)
+	resp := h.handler.HandleRequest(req, "", nil)
 	h.writeResponse(w, resp)
 }
 
