@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Push all tags for both Docker images to Docker Hub.
 # Reads the current version from docker/.tags.
-# Run 'make docker-images' (or utils/docker-images.sh) first.
+# Run 'make docker-images' (or utils/docker-build-images.sh) first.
 
 set -e
 

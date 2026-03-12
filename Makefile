@@ -1,4 +1,4 @@
-.PHONY: dev dev-frontend build build-frontend build-image-server build-image-sqlite-bridge docker-images docker-push clean
+.PHONY: dev dev-frontend build build-frontend docker-build-images docker-push-images clean
 
 # Binary name
 BINARY := unidb-mcp-server
@@ -40,29 +40,17 @@ build: clean build-frontend
 	mkdir -p $(BUILD_DIR)/data
 	@echo "Build complete. Output in $(BUILD_DIR)/"
 
-# build-image-server: build Docker image for the MCP server with latest tag
-# Usage: make build-image-server
-#        make build-image-server EXTRA_TAGS="v1.0.0 v1.0"
-build-image-server:
-	@utils/docker-build-server.sh $(EXTRA_TAGS)
-
-# build-image-sqlite-bridge: build Docker image for the SQLite bridge with latest tag
-# Usage: make build-image-sqlite-bridge
-#        make build-image-sqlite-bridge EXTRA_TAGS="v1.0.0 v1.0"
-build-image-sqlite-bridge:
-	@utils/docker-build-bridge.sh $(EXTRA_TAGS)
-
-# docker-images: build both Docker images with auto-versioned tags from docker/.tags
+# docker-build-images: build both Docker images with auto-versioned tags from docker/.tags
 # Version is auto-incremented (patch) each run, or override with VERSION=vX.Y.Z
 # Tags applied: latest, vX.Y, vX.Y.Z
-# Usage: make docker-images
-#        make docker-images VERSION=v2.0.0
-docker-images:
-	@VERSION=$(VERSION) utils/docker-images.sh
+# Usage: make docker-build-images
+#        make docker-build-images VERSION=v2.0.0
+docker-build-images:
+	@VERSION=$(VERSION) utils/docker-build-images.sh
 
-# docker-push: push all tags for both images to Docker Hub
-# Reads version from docker/.tags (run 'make docker-images' first)
-docker-push:
+# docker-push-images: push all tags for both images to Docker Hub
+# Reads version from docker/.tags (run 'make docker-build-images' first)
+docker-push-images:
 	@utils/docker-push.sh
 
 # clean: remove build artifacts
@@ -99,10 +87,8 @@ help:
 	@echo "  dev-frontend   - Run Vite dev server (proxy to :9093)"
 	@echo "  build-frontend - Build Vue/Vite frontend"
 	@echo "  build          - Build binary and copy files to $(BUILD_DIR)/"
-	@echo "  build-image-server        - Build MCP server Docker image with latest tag"
-	@echo "  build-image-sqlite-bridge - Build SQLite bridge Docker image with latest tag"
-	@echo "  docker-images  - Build both Docker images (auto-increment patch, or VERSION=vX.Y.Z)"
-	@echo "  docker-push    - Push all tags for both images to Docker Hub"
+	@echo "  docker-build-images - Build both Docker images (auto-increment patch, or VERSION=vX.Y.Z)"
+	@echo "  docker-push-images  - Push all tags for both images to Docker Hub"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  test           - Run tests"
 	@echo "  test-coverage  - Run tests with coverage report"

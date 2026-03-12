@@ -1,13 +1,12 @@
 #!/usr/bin/env sh
 # Build both Docker images with auto-versioned tags.
 # Reads current version from docker/.tags, auto-increments patch, then writes back.
-# Override version with: VERSION=v2.0.0 ./utils/docker-images.sh
+# Override version with: VERSION=v2.0.0 ./utils/docker-build-images.sh
 #
 # Tags applied to each image: latest, vMAJOR.MINOR, vMAJOR.MINOR.PATCH
 
 set -e
 
-BINARY="unidb-mcp-server"
 TAGS_FILE="docker/.tags"
 
 # Determine version to use
@@ -26,9 +25,9 @@ MAJ_MIN=$(echo "${VERSION_TO_USE}" | sed 's/^v//' | cut -d. -f1-2)
 echo "Building images: ${VERSION_TO_USE}  (tags: latest, v${MAJ_MIN}, ${VERSION_TO_USE})"
 
 docker build -f docker/Dockerfile \
-    -t "mikespook/${BINARY}:latest" \
-    -t "mikespook/${BINARY}:v${MAJ_MIN}" \
-    -t "mikespook/${BINARY}:${VERSION_TO_USE}" .
+    -t "mikespook/unidb-mcp-server:latest" \
+    -t "mikespook/unidb-mcp-server:v${MAJ_MIN}" \
+    -t "mikespook/unidb-mcp-server:${VERSION_TO_USE}" .
 
 docker build -f docker/Dockerfile.bridge \
     -t "mikespook/unidb-sqlite-bridge:latest" \
