@@ -218,12 +218,12 @@ func (d *EtcdDriver) GetTableSchema(h Handle, key string) ([]map[string]interfac
 
 	kv := resp.Kvs[0]
 	info := map[string]interface{}{
-		"key":          string(kv.Key),
-		"value":        string(kv.Value),
-		"version":      kv.Version,
-		"create_rev":   kv.CreateRevision,
-		"mod_rev":      kv.ModRevision,
-		"lease":        kv.Lease,
+		"key":        string(kv.Key),
+		"value":      string(kv.Value),
+		"version":    kv.Version,
+		"create_rev": kv.CreateRevision,
+		"mod_rev":    kv.ModRevision,
+		"lease":      kv.Lease,
 	}
 	return []map[string]interface{}{info}, nil
 }
