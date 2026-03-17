@@ -16,22 +16,22 @@ import (
 
 // BridgeConfig holds the bridge configuration
 type BridgeConfig struct {
-	Name       string
-	Secret     string
-	FilePath   string
-	UniDBURL   string
-	Reconnect  bool
+	Name           string
+	Secret         string
+	FilePath       string
+	UniDBURL       string
+	Reconnect      bool
 	ReconnectDelay time.Duration
 }
 
 // Client represents an SSE client that connects to UniDB server
 type Client struct {
-	config   BridgeConfig
-	bridge   *SQLiteBridge
-	mu       sync.RWMutex
-	running  bool
-	ctx      context.Context
-	cancel   context.CancelFunc
+	config  BridgeConfig
+	bridge  *SQLiteBridge
+	mu      sync.RWMutex
+	running bool
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 // MCPRequest represents an MCP request
@@ -85,7 +85,7 @@ func (c *Client) Start() error {
 			if !c.config.Reconnect {
 				return err
 			}
-			
+
 			select {
 			case <-c.ctx.Done():
 				return nil
@@ -97,7 +97,7 @@ func (c *Client) Start() error {
 			if !c.config.Reconnect {
 				return nil
 			}
-			
+
 			select {
 			case <-c.ctx.Done():
 				return nil
@@ -111,8 +111,8 @@ func (c *Client) Start() error {
 // connectAndListen establishes SSE connection and listens for commands
 func (c *Client) connectAndListen() error {
 	// Connect to SSE endpoint
-	sseURL := fmt.Sprintf("%s/sse?name=%s&secret=%s", 
-		c.config.UniDBURL, 
+	sseURL := fmt.Sprintf("%s/sse?name=%s&secret=%s",
+		c.config.UniDBURL,
 		url.QueryEscape(c.config.Name),
 		url.QueryEscape(c.config.Secret))
 
@@ -152,7 +152,7 @@ func (c *Client) readSSE(reader io.Reader) error {
 		}
 
 		line := scanner.Text()
-		
+
 		if line == "" {
 			// Empty line means end of event
 			if eventData != "" {
