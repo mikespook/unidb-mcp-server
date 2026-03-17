@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"golang.org/x/crypto/bcrypt"
 	gorbac "github.com/mikespook/gorbac/v3"
+	"golang.org/x/crypto/bcrypt"
 
 	apprbac "github.com/mikespook/unidb-mcp/internal/rbac"
 	"github.com/mikespook/unidb-mcp/internal/store"

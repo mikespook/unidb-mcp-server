@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	gorbac "github.com/mikespook/gorbac/v3"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/mikespook/unidb-mcp/internal/database"
 	apprbac "github.com/mikespook/unidb-mcp/internal/rbac"
