@@ -40,6 +40,7 @@ const (
 	MethodNotFound = -32601
 	InvalidParams  = -32602
 	InternalError  = -32603
+	AccessDenied   = -32001 // DSN access denied (not in allowlist or team)
 )
 
 // Handler handles MCP requests
@@ -230,8 +231,8 @@ func (h *Handler) handleConnect(id interface{}, args map[string]interface{}, use
 				JSONRPC: "2.0",
 				ID:      id,
 				Error: &Error{
-					Code:    InvalidParams,
-					Message: fmt.Sprintf("DSN not allowed: %s", dsnName),
+					Code:    AccessDenied,
+					Message: fmt.Sprintf("access denied: %s", dsnName),
 				},
 			}
 		}
@@ -256,8 +257,8 @@ func (h *Handler) handleConnect(id interface{}, args map[string]interface{}, use
 				JSONRPC: "2.0",
 				ID:      id,
 				Error: &Error{
-					Code:    InvalidParams,
-					Message: fmt.Sprintf("DSN not allowed: %s", dsnName),
+					Code:    AccessDenied,
+					Message: fmt.Sprintf("access denied: %s", dsnName),
 				},
 			}
 		}
