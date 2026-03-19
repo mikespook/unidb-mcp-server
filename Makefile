@@ -1,4 +1,4 @@
-.PHONY: dev dev-frontend build build-frontend docker-build-images docker-push-images clean
+.PHONY: all dev dev-frontend build build-frontend build-docker-images push-docker-images clean test test-coverage lint fmt tidy help
 
 # Binary name
 BINARY := unidb-mcp-server
@@ -41,7 +41,7 @@ build: clean build-frontend
 	mkdir -p $(BUILD_DIR)/data
 	@echo "Build complete. Output in $(BUILD_DIR)/"
 
-# docker-build-images: build both Docker images with auto-versioned tags from docker/.tags
+# docker-build-images: build all Docker images with auto-versioned tags from docker/.tags
 # Version is auto-incremented (patch) each run, or override with VERSION=vX.Y.Z
 # Tags applied: latest, vX.Y, vX.Y.Z
 # Usage: make docker-build-images
@@ -58,7 +58,6 @@ push-docker-images:
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
-	rm -f $(BINARY)
 
 # Run tests
 test:
@@ -67,11 +66,11 @@ test:
 # Run tests with coverage
 test-coverage:
 	go test -C backend -v -coverprofile=../coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -html=../coverage.out -o coverage.html
 
 # Lint the code
 lint:
-	golangci-lint run ./backend/...
+	golangci-lint run backend/...
 
 # Format the code
 fmt:
