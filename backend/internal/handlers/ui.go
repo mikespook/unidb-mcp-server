@@ -229,7 +229,7 @@ func (h *UIHandler) ListDSNs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, dsn := range dsns {
-		if dsn.Driver == "sqlite-bridge" {
+		if dsn.Driver == "sqlite-bridge" || dsn.Driver == "boltdb-bridge" {
 			dsn.Connected = h.bridgeManager.IsConnected(dsn.Name)
 		}
 	}
@@ -377,12 +377,12 @@ func (h *UIHandler) TestDSN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if dsn.Driver == "sqlite-bridge" {
+	if dsn.Driver == "sqlite-bridge" || dsn.Driver == "boltdb-bridge" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error":   "connection test not supported for sqlite-bridge",
+			"error":   "connection test not supported for " + dsn.Driver,
 		})
 		return
 	}

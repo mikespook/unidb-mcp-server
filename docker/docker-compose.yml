@@ -18,6 +18,34 @@ services:
       retries: 3
       start_period: 10s
 
+  # Example sqlite-bridge sidecar — uncomment and configure as needed
+  # sqlite-bridge:
+  #   image: mikespook/unidb-sqlite-bridge:latest
+  #   environment:
+  #     - BRIDGE_NAME=mydb
+  #     - BRIDGE_SECRET=your-secret
+  #     - UNIDB_URL=http://unidb-mcp:9093
+  #   volumes:
+  #     - /path/to/your/database.db:/data/sqlite.db:ro
+  #   depends_on:
+  #     unidb-mcp:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  # Example boltdb-bridge sidecar — uncomment and configure as needed
+  # boltdb-bridge:
+  #   image: mikespook/unidb-boltdb-bridge:latest
+  #   environment:
+  #     - BRIDGE_NAME=mydb
+  #     - BRIDGE_SECRET=your-secret
+  #     - UNIDB_URL=http://unidb-mcp:9093
+  #   volumes:
+  #     - /path/to/your/database.db:/data/boltdb.db:ro
+  #   depends_on:
+  #     unidb-mcp:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
 volumes:
   unidb-data:
     driver: local

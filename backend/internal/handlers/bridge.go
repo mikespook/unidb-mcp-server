@@ -25,17 +25,23 @@ func NewBridgeManager(s *store.Store) *BridgeManager {
 	}
 }
 
+// bridgeDrivers lists all recognized bridge driver names.
+var bridgeDrivers = []string{"sqlite-bridge", "boltdb-bridge"}
+
 // Authenticate verifies bridge credentials by looking up the DSN entry.
-// For sqlite-bridge entries the secret is stored in the dsn field.
+// The secret is stored in the dsn field for all bridge drivers.
 func (m *BridgeManager) Authenticate(name, secret string) error {
-	dsn, err := m.store.GetByNameAndDriver(name, "sqlite-bridge")
-	if err != nil {
-		return ErrBridgeNotFound
+	for _, driver := range bridgeDrivers {
+		dsn, err := m.store.GetByNameAndDriver(name, driver)
+		if err != nil {
+			continue
+		}
+		if dsn.DSN != secret {
+			return ErrInvalidSecret
+		}
+		return nil
 	}
-	if dsn.DSN != secret {
-		return ErrInvalidSecret
-	}
-	return nil
+	return ErrBridgeNotFound
 }
 
 // SetConnected updates the in-memory connection status and bumps updated_at in the DB.
@@ -44,11 +50,14 @@ func (m *BridgeManager) SetConnected(name string, connected bool) error {
 	m.connected[name] = connected
 	m.mu.Unlock()
 
-	dsn, err := m.store.GetByNameAndDriver(name, "sqlite-bridge")
-	if err != nil {
-		return err
+	for _, driver := range bridgeDrivers {
+		dsn, err := m.store.GetByNameAndDriver(name, driver)
+		if err != nil {
+			continue
+		}
+		return m.store.TouchUpdatedAt(dsn.ID)
 	}
-	return m.store.TouchUpdatedAt(dsn.ID)
+	return ErrBridgeNotFound
 }
 
 // IsConnected returns whether the named bridge is currently connected.

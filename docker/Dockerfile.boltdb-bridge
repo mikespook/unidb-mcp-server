@@ -1,0 +1,42 @@
+# Build stage
+FROM golang:1.26-alpine AS builder
+
+WORKDIR /app/backend
+
+# Copy go mod files
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY backend/ .
+
+# Build the bridge binary (pure Go, no CGO required)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/unidb-boltdb-bridge ./cmd/boltdb-bridge
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -D appuser
+
+# Copy binary
+COPY --from=builder /app/unidb-boltdb-bridge .
+
+# Create /data mount point
+RUN mkdir -p /data && chown appuser:appgroup /data
+
+# Copy entrypoint script
+COPY --from=builder /app/backend/cmd/boltdb-bridge/docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+USER appuser
+
+# /data/boltdb.db must be mounted by the user
+VOLUME ["/data"]
+
+ENTRYPOINT ["./docker-entrypoint.sh"]

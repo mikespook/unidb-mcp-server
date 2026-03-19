@@ -39,6 +39,6 @@ fi
 exec ./unidb-sqlite-bridge \
     -name "$BRIDGE_NAME" \
     -file "$SQLITE_FILE" \
-    -unidb "${UNIDB_URL:-http://localhost:9093}" \
+    -unidb "${UNIDB_URL:-http://unidb-mcp:9093}" \
     -secret "$BRIDGE_SECRET" \
     -reconnect "${RECONNECT:-true}"

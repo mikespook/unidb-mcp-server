@@ -38,6 +38,7 @@ require (
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	go.etcd.io/bbolt v1.4.3 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.8 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.8 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
