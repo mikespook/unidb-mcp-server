@@ -33,6 +33,7 @@ build: clean build-frontend
 	@echo "Building $(BINARY)..."
 	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/$(BINARY) ./cmd/mcp-server
 	CGO_ENABLED=1 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/unidb-sqlite-bridge ./cmd/sqlite-bridge
+	CGO_ENABLED=0 go build -C backend $(LDFLAGS) -o ../$(BUILD_DIR)/unidb-boltdb-bridge ./cmd/boltdb-bridge
 	@echo "Copying frontend dist..."
 	mkdir -p $(BUILD_DIR)/frontend
 	cp -r frontend/dist $(BUILD_DIR)/frontend/dist
@@ -45,12 +46,12 @@ build: clean build-frontend
 # Tags applied: latest, vX.Y, vX.Y.Z
 # Usage: make docker-build-images
 #        make docker-build-images VERSION=v2.0.0
-docker-build-images:
+build-docker-images:
 	@VERSION=$(VERSION) utils/docker-build-images.sh
 
 # docker-push-images: push all tags for both images to Docker Hub
 # Reads version from docker/.tags (run 'make docker-build-images' first)
-docker-push-images:
+push-docker-images:
 	@utils/docker-push.sh
 
 # clean: remove build artifacts
